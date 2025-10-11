@@ -1,0 +1,52 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+.python-version
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Tool caches
+.mypy_cache/
+.pytype/
+.ruff_cache/
+.cache/
+.ipynb_checkpoints/
+
+# Runtime and local data
+*.log
+tmp/
+logs/
+
+# Environment configuration
+.env
+.env.*
+
+# Project-specific tooling directories
+.serena/
+.claude/
+claudedocs/
+
+
+# Credentials (managed outside version control)
+credentials/
+
+# OS files
+.DS_Store
+Thumbs.db
