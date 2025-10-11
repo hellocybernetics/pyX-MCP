@@ -1,14 +1,17 @@
 [project]
 name = "twitter"
 version = "0.1.0"
-description = "Add your description here"
+description = "Twitter API client library with tweepy and pydantic"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "tweepy>=4.16.0",
     "pydantic>=2.8.0",
-    "pytest>=8.3.0",
 ]
 
 [tool.uv]
-dev-dependencies = []
+dev-dependencies = [
+    "pytest>=8.3.0",
+    "pytest-cov>=5.0.0",
+    "pytest-httpx>=0.30.0",
+]

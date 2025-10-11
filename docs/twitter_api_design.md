@@ -21,7 +21,7 @@ twitter_client/
   auth.py               # OAuth 1.0a/2.0 フローおよびトークン管理
   clients/
     __init__.py
-    tweepy_client.py    # tweepy.Client / API の薄いラッパー (メイン)
+    tweepy_client.py    # tweepy.Client(v2) + tweepy.API(v1.1) のデュアルラッパー
     rest_client.py      # requests/httpx ベースのフォールバック (必要時)
   exceptions.py         # ドメイン固有例外定義
   rate_limit.py         # レート制限情報のパースとバックオフ戦略
@@ -61,9 +61,9 @@ tests/
 - `callback_handler` により CLI/GUI/MCP など異なる UX に対応。
 
 ### 4.3 TweepyClient (`clients/tweepy_client.py`)
-- 役割: `tweepy.Client` (v2) を初期化し、投稿系エンドポイントと `/2/media/*` 系のアップロードワークフローを一元的に扱う。v1.1 API への依存は残さない。
-- API: `create_tweet(...)`, `delete_tweet(...)`, `upload_media(init_args, file_iterable)` など tweepy が提供するメソッドをラップし、例外をドメイン例外に変換。
-- メディアアップロードは v2 の 3 段階（初期化→チャンク追加→最終化/ステータス確認）をサポートし、レスポンスの `processing_info` を監視して完了を待機する。
+- 役割: ツイート操作は `tweepy.Client` (v2) を利用し、メディアアップロードは `tweepy.API` (v1.1) の `media_upload` フローを利用するデュアルクライアントを提供する。サービス層からは単一インターフェースで扱えるよう共通ラッパーを実装する。
+- API: `create_tweet(...)`, `delete_tweet(...)`, `upload_media(file_path, media_category, chunked=True)` などを提供し、内部で v2/v1.1 の適切な呼び出しへ委譲した上で、例外をドメイン例外に変換。
+- メディアアップロードは v1.1 の 3 段階（初期化→チャンク追加→最終化/ステータス確認）をサポートし、レスポンスの `processing_info` を監視して完了を待機する。今後 v2 側に正式エンドポイントが追加された場合に差し替え可能な抽象化を維持する。
 - レート制限・リトライは `rate_limit.py` に委譲し、必要に応じて指数バックオフを適用。
 
 ### 4.4 RestClient (`clients/rest_client.py`)
@@ -134,17 +134,17 @@ tests/
 - **パッケージ命名**: `twitter_client` で統一。将来公式 SDK と衝突しないか確認するため、PyPI 公開時には `xclient-twitter` など代替名を検討。
 - **Config 管理**: JSON 保存に加え、環境変数優先の二重読込を採用。`ConfigManager` で `load_credentials(priority=('env', 'file'))` を提供。
 - **認証フロー**: OAuth 1.0a は従来通りブラウザリダイレクト、MCP 連携時は `callback_handler` としてコマンドライン／対話 UI／MCP セッション情報を差し替え可能にする。
-- **クライアント実装**: tweepy を一次選択とし、`clients/tweepy_client.py` で v2 のツイート/メディアエンドポイントとチャンクアップロードフローを統合管理。細かな制御が必要になった場合に備えて `rest_client.py` を後日追加できるようインタフェースを整備。
+- **クライアント実装**: tweepy を一次選択とし、`clients/tweepy_client.py` で v2 のツイート操作 (`tweepy.Client`) と v1.1 のメディアアップロード (`tweepy.API.media_upload`) をデュアルクライアント構成で統合管理。細かな制御が必要になった場合に備えて `rest_client.py` を後日追加できるようインタフェースを整備。
 - **サービス分割**: `TweetService` と `MediaService` を最優先で実装。`UserService` と検索機能はフェーズ2で追加する。共通 `BaseService` を用意し、エンドポイントパスとレスポンス変換を一元化。
 - **例外設計**: API 応答に含まれるエラーコードを `ApiResponseError` の `code` フィールドへ格納。`RateLimitExceeded` にはリセット時刻を保持し、上位で待機ロジックに利用。
-- **メディア処理**: 画像・動画とも v2 のチャンクアップロードフローを前提にし、`MediaProcessingTimeout` / `MediaProcessingFailed` でユーザー通知と再試行判断を行う。
+- **メディア処理**: 画像・動画とも v1.1 の `media_upload` チャンクアップロードフローを前提にし、`MediaProcessingTimeout` / `MediaProcessingFailed` でユーザー通知と再試行判断を行う。
 - **モデル層**: 全て `pydantic` v2 BaseModel で定義し、型検証・シリアライズを統一。MCP 連携向けの JSON Schema も `model.model_json_schema()` から生成する。
 - **ロギング**: `logging` module を使用し、`TwitterClient` 初期化時に外部から Logger を渡せるようにする。デフォルトは WARNING レベル。
 - **テスト方針**: `pytest` ＋ `pytest-httpx` を採用し、HTTP モックを標準化。OAuth フローのユニットテストでは `callback_handler` をダミー化し、トークン保存を temp ディレクトリで検証。
 - **未決事項**: Streaming API への対応有無、v2 エンドポイントのスコープ設定、MCP 側のスキーマ仕様詳細。フェーズ1完了時点で再レビュー。
 
 ## 11. 外部ライブラリ比較まとめ
-- **tweepy**: 認証～投稿/取得/メディア(v2 `/2/media/*` のチャンクアップロード含む)を一貫提供するデファクト。コミュニティと更新頻度が高く、コアクライアントに採用。
+- **tweepy**: 認証～投稿/取得を担う `tweepy.Client` (v2) と、メディアアップロードを担う `tweepy.API.media_upload` (v1.1) を併用する構成で採用。コミュニティと更新頻度が高く、コアクライアントに適する。
 - **twarc**: JSON 収集に強く、Academic 目的での全量取得や再水和に最適。バルク収集機能を将来追加する際の拡張候補として保持。
 - **TwitterAPI (geduldig)**: 低レベル制御が可能な薄いラッパー。Premium/Ads、細かなリクエストチューニングが必要になった場合に `rest_client.py` の実装参考とする。
 - **python-twitter / PyTweet など**: メンテナンス停止または更新頻度低下により採用優先度は低い。特定ユースケースでのみスポット利用を検討。
@@ -152,8 +152,8 @@ tests/
 - **twitivity / twitter-stream.py**: Account Activity や v2 ストリーム用。イベント駆動連携が優先された段階で `stream_service.py` と連携させる。
 
 ## 12. メディア処理要件
-- 画像は `image/jpeg`, `image/png`, `image/webp`, `image/gif` を対象とし、v2 の 5MB 制限に収まるか事前検証する。
-- 動画は `video/mp4` (H.264/AAC) を前提にし、最大 512MB までのチャンクアップロードと処理完了待機を実装する。
+- 画像は `image/jpeg`, `image/png`, `image/webp`, `image/gif` を対象とし、v1.1 メディアアップロード (`media_category=tweet_image`) の 5MB 制限に収まるか事前検証する。
+- 動画は `video/mp4` (H.264/AAC) を前提にし、v1.1 の chunked upload API で最大 512MB までのチャンクアップロードと処理完了待機を実装する。
 - `MediaService` では MIME 判定・サイズチェック・適切な `media_category` (`tweet_image`, `tweet_gif`, `tweet_video`) の自動設定を行う。
 - アップロード後の `processing_info` を監視し、`pending`/`in_progress` の場合は `check_after_secs` に従いポーリング。最大待機時間を超えた場合は `MediaProcessingTimeout` を送出し、ユーザーに再試行を促す。
 - 失敗 (`failed`) 時は `error.code` と `message` を含む `MediaProcessingFailed` 例外を用意し、再アップロードや再エンコード判断に活かせるようにする。
@@ -164,3 +164,25 @@ tests/
   - 例: `git show HEAD^:oldsrc/twitter_api_tweepy.py`
   - 例: `git checkout <old-commit> -- oldsrc`
 - 旧実装は v1.1 メディアエンドポイント依存のため、最新 API では動作しない点に注意。
+
+## 14. 今後の実装計画（2025-10-11 時点）
+### 14.1 スプリント 1（～2025-10-18）
+- `pyproject.toml` で `pytest` を通常依存から dev グループへ移行し、`docs/README` 系のセットアップ手順を `uv run -g dev pytest` へ更新する。
+- `clients/tweepy_client.py` を v2/v1.1 デュアルクライアント構成にリファクタリングし、初期化コードとサービス層を両 API に対応させる。必要な資格情報（Consumer Keys + OAuth2 Bearer）読み込みを `ConfigManager` で整合させる。
+- メディアアップロードのユニットテストを v1.1 `media_upload`/`get_status` に合わせて更新し、ツイート操作が引き続き v2 で機能することを検証する。
+- `tests/integration/` に HTTP モック（`pytest-httpx` 予定）を用いたツイート投稿・メディアアップロードの正常系/エラー系テストを追加し、CI から実行できるよう `pyproject.toml` にテストコマンドを定義する。
+
+### 14.2 スプリント 2（2025-10-19 ～ 2025-10-31）
+- `MediaService` のポーリングタイムアウト/失敗分岐を再検証し、リトライ間隔と最大待機時間を設定値として切り出した上で、integration テストでタイムアウト例外と失敗例外をカバーする。
+- 50MB 超の動画を想定した v1.1 チャンクアップロード時のファイルストリーミング処理をベンチマークし、必要に応じて `iter(lambda: file.read(chunk_size), b"")` 方式へリファクタリング。あわせて大容量メディア向けテストを追加。
+- ロガー注入とレートリミット待機の挙動を確認するため、`rate_limit.py` のバックオフ戦略を `TweetService` / `MediaService` 経由で検証する統合テストを作成。
+
+### 14.3 スプリント 3（2025-11-01 ～ 2025-11-15）
+- MCP アダプタ (`twitter_client/integrations/mcp_adapter.py`) の骨格を実装し、CLI からの認証フローと共通化できるよう抽象インタフェースを整備する。
+- `UserService`（フォロー/プロフィール取得）と `StreamService` の最小実装を追加し、既存サービスと同様に例外・モデルを整合させる。
+- 依存パッケージの監査（tweepy, httpx, pydantic）を実施し、Minor アップデートを適用。`uv.lock` を更新し、リリースノートを `docs/` 配下に追記する。
+
+### 14.4 継続的タスク
+- レートリミット例外・メディア処理例外に対するアラートルールを設計し、今後導入する監視基盤と連携できるようログフォーマットを整理する。
+- 技術的負債（未実装サービス、例外メッセージの英文化、サーキットブレーカ導入など）を GitHub Issues もしくは `docs/roadmap.md` へ蓄積し、レビュー時に優先度を再評価する。
+- 外部 API 仕様変更を月次で確認し、必要に応じてモデル/サービスの互換性テストを更新する。

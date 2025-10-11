@@ -128,6 +128,9 @@ class ConfigManager:
         with self._credential_path.open("w", encoding="utf-8") as fp:
             json.dump(merged.to_dict(), fp, indent=2, sort_keys=True)
 
+        # Set file permissions to owner read/write only for security
+        os.chmod(self._credential_path, 0o600)
+
     def _load_from_env(self) -> TwitterCredentials | None:
         values: dict[str, str | None] = {
             field: self._env.get(env_name) for field, env_name in ENV_VAR_MAP.items()

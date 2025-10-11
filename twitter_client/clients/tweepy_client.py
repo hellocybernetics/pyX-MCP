@@ -1,5 +1,9 @@
 """
-Thin wrapper around tweepy.Client to present a consistent interface.
+Dual wrapper around tweepy.Client (v2) and tweepy.API (v1.1).
+
+This module provides a unified interface for Twitter operations:
+- Tweet operations use tweepy.Client (v2 API)
+- Media upload uses tweepy.API (v1.1 API) since v2 has no media endpoints
 """
 
 from __future__ import annotations
@@ -24,10 +28,23 @@ else:  # pragma: no cover
 
 
 class TweepyClient:
-    """Wrapper that converts tweepy exceptions into domain exceptions."""
+    """
+    Dual-client wrapper for Twitter API operations.
 
-    def __init__(self, client: tweepy.Client) -> None:
-        self._client = client
+    Uses tweepy.Client (v2 API) for tweet operations and tweepy.API (v1.1)
+    for media upload, presenting a unified interface to service layers.
+    """
+
+    def __init__(self, v2_client: tweepy.Client, v1_api: tweepy.API) -> None:
+        """
+        Initialize dual-client wrapper.
+
+        Args:
+            v2_client: tweepy.Client instance for v2 API operations (tweets)
+            v1_api: tweepy.API instance for v1.1 API operations (media)
+        """
+        self._client = v2_client
+        self._api = v1_api
 
     def create_tweet(self, **kwargs: Any) -> Any:
         return self._invoke("create_tweet", **kwargs)
@@ -47,19 +64,54 @@ class TweepyClient:
         file: BinaryIO,
         media_category: str,
         mime_type: str | None = None,
+        chunked: bool = False,
         **kwargs: Any,
     ) -> Any:
-        payload = {"file": file, "media_category": media_category, **kwargs}
-        if mime_type:
-            payload["mime_type"] = mime_type
-        return self._invoke("upload_media", **payload)
+        """
+        Upload media using v1.1 API.
+
+        Routes to tweepy.API.media_upload() which supports chunked upload
+        for large files (videos). For videos >5MB, chunked=True is required.
+
+        Args:
+            file: Binary file object to upload
+            media_category: tweet_image, tweet_gif, or tweet_video
+            mime_type: MIME type (e.g., image/png, video/mp4)
+            chunked: Enable chunked upload for large files (required for videos >5MB)
+            **kwargs: Additional parameters passed to Twitter API
+
+        Returns:
+            Media upload response with media_id and processing_info
+        """
+        try:
+            # Twitter API expects 'media_type' not 'mime_type'
+            upload_kwargs = {"media_category": media_category, "chunked": chunked}
+            if mime_type:
+                upload_kwargs["media_type"] = mime_type
+            upload_kwargs.update(kwargs)
+
+            return self._api.media_upload(
+                filename=file.name if hasattr(file, "name") else "media",
+                file=file,
+                **upload_kwargs,
+            )
+        except TweepyException as exc:
+            raise self._convert_exception(exc) from exc
 
     def get_media_upload_status(self, media_id: str) -> Any:
-        if hasattr(self._client, "get_media_upload_status"):
-            return self._invoke("get_media_upload_status", media_id)
-        if hasattr(self._client, "get_media"):
-            return self._invoke("get_media", media_id)
-        raise AttributeError("tweepy.Client has no media status retrieval method.")
+        """
+        Get media processing status using v1.1 API.
+
+        Args:
+            media_id: Media ID returned from upload_media
+
+        Returns:
+            Media status object with processing_info
+        """
+        try:
+            return self._api.get_media_upload_status(media_id)
+        except TweepyException as exc:
+            raise self._convert_exception(exc) from exc
 
     def _invoke(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
         method = getattr(self._client, method_name, None)

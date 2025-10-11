@@ -50,14 +50,44 @@ class MediaService:
     sleep: Callable[[float], None] = field(default=time.sleep)
 
     def upload_image(self, path: Path, *, media_category: str = "tweet_image") -> MediaUploadResult:
+        """
+        Upload image file (up to 5MB).
+
+        Args:
+            path: Path to image file (jpeg, png, webp, gif)
+            media_category: Media category for Twitter API (default: tweet_image)
+
+        Returns:
+            MediaUploadResult with media_id
+
+        Raises:
+            MediaValidationError: If file size exceeds limit or MIME type unsupported
+        """
         path = self._validate_path(path)
         mime_type = self._validate_image(path)
-        return self._upload(path, media_category=media_category, mime_type=mime_type)
+        # Images don't need chunked upload (all under 5MB limit)
+        return self._upload(path, media_category=media_category, mime_type=mime_type, chunked=False)
 
     def upload_video(self, path: Path, *, media_category: str = "tweet_video") -> MediaUploadResult:
+        """
+        Upload video file (up to 512MB with chunked upload).
+
+        Args:
+            path: Path to video file (mp4)
+            media_category: Media category for Twitter API (default: tweet_video)
+
+        Returns:
+            MediaUploadResult with media_id and processing_info
+
+        Raises:
+            MediaValidationError: If file size exceeds limit or MIME type unsupported
+            MediaProcessingTimeout: If processing takes too long
+            MediaProcessingFailed: If Twitter's processing fails
+        """
         path = self._validate_path(path)
         mime_type = self._validate_video(path)
-        return self._upload(path, media_category=media_category, mime_type=mime_type)
+        # Videos require chunked upload for files >5MB (we enable it for all videos)
+        return self._upload(path, media_category=media_category, mime_type=mime_type, chunked=True)
 
     def _upload(
         self,
@@ -65,12 +95,26 @@ class MediaService:
         *,
         media_category: str,
         mime_type: str | None,
+        chunked: bool = False,
     ) -> MediaUploadResult:
+        """
+        Upload media file to Twitter API.
+
+        Args:
+            path: Path to media file
+            media_category: tweet_image, tweet_gif, or tweet_video
+            mime_type: MIME type of the file
+            chunked: Enable chunked upload (required for videos >5MB)
+
+        Returns:
+            MediaUploadResult with media_id and processing status
+        """
         with path.open("rb") as file_obj:
             response = self.client.upload_media(
                 file=file_obj,
                 media_category=media_category,
                 mime_type=mime_type,
+                chunked=chunked,
             )
         result = MediaUploadResult.from_api(response)
         return self._await_processing(result)

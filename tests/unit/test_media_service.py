@@ -22,11 +22,12 @@ class FakeMediaClient:
         self.status_responses = status_responses or []
         self._status_index = 0
 
-    def upload_media(self, *, file, media_category, mime_type=None, **kwargs):
+    def upload_media(self, *, file, media_category, mime_type=None, chunked=False, **kwargs):
         self.upload_calls.append(
             {
                 "media_category": media_category,
                 "mime_type": mime_type,
+                "chunked": chunked,
                 "extra": kwargs,
                 "closed": file.closed,
             }
@@ -62,6 +63,7 @@ def test_upload_image_validates_and_returns_result(tmp_path: Path) -> None:
     assert result.media_id == "1"
     assert client.upload_calls[0]["media_category"] == "tweet_image"
     assert client.upload_calls[0]["mime_type"] == "image/png"
+    assert client.upload_calls[0]["chunked"] is False  # Images don't need chunked
 
 
 def test_upload_image_rejects_large_files(tmp_path: Path) -> None:
@@ -93,6 +95,9 @@ def test_upload_video_polls_until_success(tmp_path: Path) -> None:
     assert result.processing_info is not None
     assert result.processing_info.state.lower() == "succeeded"
     assert client.status_calls == ["42", "42"]
+    # Verify chunked upload is enabled for videos
+    assert client.upload_calls[0]["chunked"] is True
+    assert client.upload_calls[0]["mime_type"] == "video/mp4"
 
 
 def test_upload_video_raises_on_processing_failure(tmp_path: Path) -> None:
