@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import pytest
+import tweepy
+
+from twitter_client.auth import OAuthManager, OAuthTokens
+from twitter_client.config import ConfigManager
+from twitter_client.exceptions import AuthenticationError, ConfigurationError
+
+
+class DummyOAuthHandler:
+    def __init__(self, consumer_key: str, consumer_secret: str, callback: str | None = None) -> None:
+        self.consumer_key = consumer_key
+        self.consumer_secret = consumer_secret
+        self.callback = callback
+        self.access_token = "new-access-token"
+        self.access_token_secret = "new-access-secret"
+        self._verifier: str | None = None
+
+    def get_authorization_url(self) -> str:
+        return "https://twitter.com/oauth/authorize"
+
+    def get_access_token(self, verifier: str) -> str:
+        self._verifier = verifier
+        return self.access_token
+
+
+def test_ensure_oauth1_token_returns_cached_tokens(tmp_path) -> None:
+    env = {
+        "TWITTER_API_KEY": "api-key",
+        "TWITTER_API_SECRET": "api-secret",
+        "TWITTER_ACCESS_TOKEN": "cached-access",
+        "TWITTER_ACCESS_TOKEN_SECRET": "cached-secret",
+    }
+    manager = ConfigManager(credential_path=tmp_path / "twitter.json", env=env)
+    oauth = OAuthManager(manager)
+
+    tokens = oauth.ensure_oauth1_token()
+    assert tokens == OAuthTokens("cached-access", "cached-secret")
+
+
+def test_start_oauth1_flow_persists_tokens(tmp_path) -> None:
+    env = {
+        "TWITTER_API_KEY": "api-key",
+        "TWITTER_API_SECRET": "api-secret",
+    }
+    path = tmp_path / "twitter.json"
+    manager = ConfigManager(credential_path=path, env=env)
+
+    def factory(*args, **kwargs):
+        return DummyOAuthHandler(*args, **kwargs)
+
+    def callback(url: str) -> str:
+        assert "oauth" in url
+        return "verifier-code"
+
+    oauth = OAuthManager(manager, callback_handler=callback, oauth_handler_factory=factory)  # type: ignore[arg-type]
+    tokens = oauth.ensure_oauth1_token()
+
+    assert tokens.access_token == "new-access-token"
+    data = path.read_text(encoding="utf-8")
+    assert "new-access-secret" in data
+
+
+def test_start_oauth1_flow_raises_on_auth_failure(tmp_path) -> None:
+    env = {
+        "TWITTER_API_KEY": "api-key",
+        "TWITTER_API_SECRET": "api-secret",
+    }
+    manager = ConfigManager(credential_path=tmp_path / "twitter.json", env=env)
+
+    class FailingHandler(DummyOAuthHandler):
+        def get_authorization_url(self) -> str:
+            raise tweepy.errors.TweepyException("boom")
+
+    def factory(*args, **kwargs):
+        return FailingHandler(*args, **kwargs)
+
+    oauth = OAuthManager(manager, callback_handler=lambda _: "code", oauth_handler_factory=factory)  # type: ignore[arg-type]
+
+    with pytest.raises(AuthenticationError):
+        oauth.start_oauth1_flow()
+
+
+def test_refresh_token_requires_callback(tmp_path) -> None:
+    manager = ConfigManager(
+        credential_path=tmp_path / "twitter.json",
+        env={
+            "TWITTER_API_KEY": "api-key",
+            "TWITTER_API_SECRET": "api-secret",
+        },
+    )
+    oauth = OAuthManager(manager)
+
+    with pytest.raises(ConfigurationError):
+        oauth.refresh_token()
