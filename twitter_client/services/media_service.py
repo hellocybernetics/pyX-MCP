@@ -53,9 +53,12 @@ class MediaService:
         """
         Upload image file (up to 5MB).
 
+        GIFs are automatically routed to tweet_gif category with chunked upload enabled.
+
         Args:
             path: Path to image file (jpeg, png, webp, gif)
             media_category: Media category for Twitter API (default: tweet_image)
+                           Note: GIFs automatically use tweet_gif regardless of this parameter
 
         Returns:
             MediaUploadResult with media_id
@@ -65,7 +68,12 @@ class MediaService:
         """
         path = self._validate_path(path)
         mime_type = self._validate_image(path)
-        # Images don't need chunked upload (all under 5MB limit)
+
+        # GIFs require tweet_gif category and chunked upload
+        if mime_type == "image/gif":
+            return self._upload(path, media_category="tweet_gif", mime_type=mime_type, chunked=True)
+
+        # Other images don't need chunked upload (all under 5MB limit)
         return self._upload(path, media_category=media_category, mime_type=mime_type, chunked=False)
 
     def upload_video(self, path: Path, *, media_category: str = "tweet_video") -> MediaUploadResult:

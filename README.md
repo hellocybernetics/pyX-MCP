@@ -8,9 +8,12 @@
   - `TwitterClientFactory`: デュアルクライアント初期化を簡素化
   - ConfigManager・OAuthManager・TweepyClient（デュアルクライアント）・TweetService・MediaService を実装済み
   - **デュアルクライアント構成**: ツイート操作はtweepy.Client (v2 API)、メディアアップロードはtweepy.API (v1.1 API)を使用
-- テスト: **38テスト全て通過** ✅
-  - ユニットテスト: 28ケース（factory/config/auth/client/services）
-  - 統合テスト: 10ケース（エンドツーエンドワークフロー）
+  - **GIF 自動ルーティング**: GIF ファイルは自動的に `tweet_gif` カテゴリ + チャンクアップロードへルーティング
+  - **ポーリング設定外部化**: MediaService の `poll_interval` と `timeout` をコンストラクタで設定可能
+- テスト: **46テスト成功（1スキップ）** ✅
+  - ユニットテスト: 32ケース（factory/config/auth/client/services + GIF/polling tests）
+  - 統合テスト: 15ケース（ワークフロー検証 10ケース + HTTP モック 5ケース）
+  - HTTP モックテスト: responses ライブラリで実 API 呼び出しをモック
 - セキュリティ強化: 認証情報ファイルのパーミッション自動設定 (0o600)
 - 動作例: `examples/post_tweet.py` で実際の使用方法を提供
 - 旧実装の参照: `git show <commit>:oldsrc/twitter_api_tweepy.py` 等で取得可能
@@ -98,10 +101,13 @@ python examples/post_tweet.py "Check out this video!" --video path/to/video.mp4
 
 ## 次のアクション例
 1. ✅ **完了**: `TwitterClientFactory` 実装とテストケース追加（Sprint 1）
-2. ✅ **完了**: 統合テスト追加（10ケース追加、計38テスト）
+2. ✅ **完了**: 統合テスト追加（15ケース: ワークフロー 10 + HTTP モック 5）
 3. ✅ **完了**: 動作例 `examples/post_tweet.py` 作成
-4. `UserService` などフェーズ2 以降のモジュールを実装する。
-5. MCP アダプタや連携手順を追加する。
+4. ✅ **完了**: GIF 自動ルーティング + ポーリング設定外部化
+5. **Sprint 2**: レート制限実装（`rate_limit.py` 完成、backoff 戦略）
+6. **Sprint 2**: 50MB+ 動画ストリーミング最適化
+7. `UserService` などフェーズ2 以降のモジュールを実装する
+8. MCP アダプタや連携手順を追加する
 
 ## テストの実行
 ```bash

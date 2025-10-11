@@ -132,3 +132,93 @@ def test_upload_video_times_out_when_processing_hangs(tmp_path: Path) -> None:
     with pytest.raises(MediaProcessingTimeout):
         service.upload_video(file_path)
 
+
+def test_upload_gif_routes_to_tweet_gif_with_chunked(tmp_path: Path) -> None:
+    """GIF images are automatically routed to tweet_gif category with chunked upload."""
+    file_path = tmp_path / "animation.gif"
+    _write_file(file_path, 1024)
+    upload_response = {
+        "media_id": "123",
+        "media_key": "3_123",
+        "processing_info": {"state": "succeeded"},
+    }
+    client = FakeMediaClient(upload_response=upload_response)
+    service = MediaService(client, sleep=lambda _: None)
+
+    result = service.upload_image(file_path)
+
+    assert result.media_id == "123"
+    # Verify GIF is routed to tweet_gif category (not tweet_image)
+    assert client.upload_calls[0]["media_category"] == "tweet_gif"
+    assert client.upload_calls[0]["mime_type"] == "image/gif"
+    # Verify chunked upload is enabled for GIFs
+    assert client.upload_calls[0]["chunked"] is True
+
+
+def test_upload_gif_ignores_media_category_parameter(tmp_path: Path) -> None:
+    """GIF images ignore media_category parameter and always use tweet_gif."""
+    file_path = tmp_path / "animation.gif"
+    _write_file(file_path, 1024)
+    upload_response = {
+        "media_id": "456",
+        "processing_info": {"state": "succeeded"},
+    }
+    client = FakeMediaClient(upload_response=upload_response)
+    service = MediaService(client, sleep=lambda _: None)
+
+    # User explicitly passes tweet_image, but GIF should override to tweet_gif
+    result = service.upload_image(file_path, media_category="tweet_image")
+
+    assert result.media_id == "456"
+    # Verify parameter is ignored for GIFs
+    assert client.upload_calls[0]["media_category"] == "tweet_gif"
+    assert client.upload_calls[0]["chunked"] is True
+
+
+def test_polling_configuration_is_customizable(tmp_path: Path) -> None:
+    """MediaService polling parameters can be configured via constructor."""
+    file_path = tmp_path / "movie.mp4"
+    _write_file(file_path, 2048)
+    upload_response = {
+        "media_id": "999",
+        "processing_info": {"state": "pending", "check_after_secs": 0},
+    }
+    status_responses = [
+        {"media_id": "999", "processing_info": {"state": "succeeded"}},
+    ]
+    client = FakeMediaClient(upload_response=upload_response, status_responses=status_responses)
+
+    # Custom polling configuration
+    custom_poll_interval = 10.0
+    custom_timeout = 300.0
+    service = MediaService(
+        client,
+        sleep=lambda _: None,
+        poll_interval=custom_poll_interval,
+        timeout=custom_timeout,
+    )
+
+    result = service.upload_video(file_path)
+
+    # Verify configuration is applied
+    assert service.poll_interval == custom_poll_interval
+    assert service.timeout == custom_timeout
+    assert result.media_id == "999"
+
+
+def test_polling_uses_default_values_when_not_specified(tmp_path: Path) -> None:
+    """MediaService uses default polling values when not explicitly configured."""
+    file_path = tmp_path / "movie.mp4"
+    _write_file(file_path, 2048)
+    upload_response = {"media_id": "123", "processing_info": {"state": "succeeded"}}
+    client = FakeMediaClient(upload_response=upload_response)
+
+    # Use default configuration (no parameters specified)
+    service = MediaService(client, sleep=lambda _: None)
+
+    result = service.upload_video(file_path)
+
+    # Verify default values are used
+    assert service.poll_interval == 2.0  # Default from dataclass
+    assert service.timeout == 60.0  # Default from dataclass
+    assert result.media_id == "123"
