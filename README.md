@@ -29,7 +29,7 @@
 ## セットアップ
 1. **Python 3.13+** を想定。パッケージ管理には `uv` を利用。
 2. 依存関係インストール: `uv sync`
-3. 認証情報は `credentials/twitter_config.json` または環境変数で管理。ファイル保存時に自動的に0o600（所有者のみ読み書き可能）に設定されます。
+3. 認証情報は `.env` / 環境変数 / `credentials/twitter_config.json` で管理。ファイル保存時に自動的に0o600（所有者のみ読み書き可能）に設定されます。
 4. **新機能**: `TwitterClientFactory` を使用してクライアントを簡単に初期化できます。
 
 ### 認証情報の設定
@@ -41,6 +41,18 @@ export TWITTER_ACCESS_TOKEN="your_access_token"
 export TWITTER_ACCESS_TOKEN_SECRET="your_access_token_secret"
 export TWITTER_BEARER_TOKEN="your_bearer_token"  # v2 API用（オプション）
 ```
+
+`.env` ファイルを利用する場合（プロジェクト直下に配置）:
+```bash
+# .env
+TWITTER_API_KEY=your_api_key
+TWITTER_API_SECRET=your_api_secret
+TWITTER_ACCESS_TOKEN=your_access_token
+TWITTER_ACCESS_TOKEN_SECRET=your_access_token_secret
+TWITTER_BEARER_TOKEN=your_bearer_token
+```
+
+`.env` はリポジトリ直下に置くと `ConfigManager` が自動的に読み込みます。別パスを使う場合は `ConfigManager(dotenv_path=Path("/path/to/.env"))` のように明示してください。 `.env*` は `.gitignore` 済みのため、バージョン管理に含めないでください。
 
 または `credentials/twitter_config.json` に保存:
 ```json
