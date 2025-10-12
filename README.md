@@ -103,6 +103,8 @@ python examples/post_tweet.py "Check out this video!" --video path/to/video.mp4
 python examples/post_tweet.py "Hello with custom env" --dotenv /secure/path/.env
 ```
 
+`examples/sample_image.png` をサンプル画像として同梱しているため、動作確認時には `--image examples/sample_image.png` を指定できます。
+
 ## 次のアクション例
 1. ✅ **完了**: `TwitterClientFactory` 実装とテストケース追加（Sprint 1）
 2. ✅ **完了**: 統合テスト追加（15ケース: ワークフロー 10 + HTTP モック 5）
