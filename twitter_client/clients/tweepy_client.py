@@ -84,21 +84,30 @@ class TweepyClient:
             Media upload response with media_id and processing_info
         """
         try:
-            # Twitter API expects 'media_type' not 'mime_type'
-            upload_kwargs = {"media_category": media_category, "chunked": chunked}
+            # Simple uploads (images <=5MB) work best with Tweepy handling file IO.
+            if not chunked:
+                upload_kwargs = {}
+                if media_category:
+                    upload_kwargs["media_category"] = media_category
+                return self._api.media_upload(
+                    filename=getattr(file, "name", "media"),
+                    **upload_kwargs,
+                )
+
+            # Chunked uploads (GIF/video) require explicit streaming.
+            upload_kwargs = {
+                "media_category": media_category,
+                "chunked": True,
+            }
             if mime_type:
                 upload_kwargs["media_type"] = mime_type
             upload_kwargs.update(kwargs)
 
-            # Tweepy passes media_type positionally; providing it as keyword causes
-            # HTTP 400 "Unexpected parameter: media_type". Strip it before calling.
-            api_kwargs = dict(upload_kwargs)
-            api_kwargs.pop("media_type", None)
-
+            # Tweepy expects file-like object for chunked uploads.
             return self._api.media_upload(
-                filename=file.name if hasattr(file, "name") else "media",
+                filename=getattr(file, "name", "media"),
                 file=file,
-                **api_kwargs,
+                **upload_kwargs,
             )
         except TweepyException as exc:
             raise self._convert_exception(exc) from exc

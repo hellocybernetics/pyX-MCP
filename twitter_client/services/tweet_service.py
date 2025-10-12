@@ -45,7 +45,8 @@ class TweetService:
     ) -> Tweet:
         payload: dict[str, Any] = {"text": text}
         if media_ids:
-            payload["media_ids"] = list(media_ids)
+            payload["media_ids"] = [int(media_id) for media_id in media_ids]
+            payload["user_auth"] = True
         if in_reply_to:
             payload["reply"] = {"in_reply_to_tweet_id": in_reply_to}
         if quote_tweet_id:
@@ -78,4 +79,3 @@ class TweetService:
 
         # When tweepy returns a single Tweet instance rather than list
         return [Tweet.from_api(data)]
-

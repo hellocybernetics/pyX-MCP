@@ -52,7 +52,8 @@ def test_create_tweet_builds_payload() -> None:
 
     assert tweet.id == "111"
     assert client.create_kwargs is not None
-    assert client.create_kwargs["media_ids"] == ["1", "2"]
+    assert client.create_kwargs["media_ids"] == [1, 2]
+    assert client.create_kwargs["user_auth"] is True
     assert client.create_kwargs["reply"] == {"in_reply_to_tweet_id": "99"}
     assert client.create_kwargs["quote_tweet_id"] == "77"
     assert client.create_kwargs["reply_settings"] == "followers"
@@ -86,4 +87,3 @@ def test_search_recent_handles_empty_result() -> None:
     tweets = service.search_recent("query")
 
     assert tweets == []
-

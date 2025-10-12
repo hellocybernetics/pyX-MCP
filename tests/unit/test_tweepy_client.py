@@ -57,8 +57,11 @@ class StubV1API:
     def set_exception(self, exc: Exception) -> None:
         self._exception = exc
 
-    def media_upload(self, *, filename, file, media_category, **kwargs):
-        self.called_with["media_upload"] = ((filename, file), {"media_category": media_category, **kwargs})
+    def media_upload(self, *, filename, file=None, media_category=None, chunked=False, **kwargs):
+        self.called_with["media_upload"] = (
+            (filename,),
+            {"file": file, "media_category": media_category, "chunked": chunked, **kwargs},
+        )
         if self._exception:
             raise self._exception
         return self.status
@@ -161,7 +164,7 @@ def test_upload_media_omits_media_type_for_non_chunked() -> None:
     kwargs = v1_api.called_with["media_upload"][1]
     assert kwargs["media_category"] == "tweet_image"
     assert kwargs["chunked"] is False
-    assert "media_type" not in kwargs
+    assert kwargs["file"] is None
 
 
 def test_upload_media_strips_media_type_when_chunked() -> None:
@@ -177,4 +180,4 @@ def test_upload_media_strips_media_type_when_chunked() -> None:
     kwargs = v1_api.called_with["media_upload"][1]
     assert kwargs["media_category"] == "tweet_video"
     assert kwargs["chunked"] is True
-    assert "media_type" not in kwargs
+    assert kwargs["file"] is file_obj
