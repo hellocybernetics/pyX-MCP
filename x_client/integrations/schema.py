@@ -41,13 +41,62 @@ class CreatePostRequest(BaseModel):
     )
 
 
+class CreateThreadRequest(BaseModel):
+    """Request schema for creating a multi-post thread."""
+
+    text: str = Field(..., description="Full text content that will be split into a thread")
+    chunk_limit: int = Field(
+        280,
+        description="Maximum characters per post segment",
+        ge=1,
+        le=280,
+    )
+    in_reply_to: str | None = Field(
+        None,
+        description="Post ID to reply to with the first segment",
+    )
+    rollback_on_failure: bool = Field(
+        True,
+        description="Whether to delete previously created posts if a later segment fails",
+    )
+
+
+class AuthorResponse(BaseModel):
+    """Response schema for user summaries."""
+
+    id: str = Field(..., description="User ID")
+    name: str | None = Field(None, description="Display name")
+    username: str | None = Field(None, description="Handle without @")
+
+
 class PostResponse(BaseModel):
     """Response schema for post operations."""
 
     id: str = Field(..., description="Unique post ID")
     text: str | None = Field(None, description="Post text content")
     author_id: str | None = Field(None, description="Author user ID")
+    author: AuthorResponse | None = Field(None, description="Author metadata when available")
     created_at: str | None = Field(None, description="Post creation timestamp (ISO 8601)")
+
+
+class CreateThreadResponse(BaseModel):
+    """Response schema for thread creation."""
+
+    posts: list[PostResponse] = Field(..., description="Successfully created thread segments")
+    succeeded: bool = Field(..., description="Whether all segments were posted")
+    failed_index: int | None = Field(
+        None,
+        description="Index of the segment that failed (0-based)",
+    )
+    rolled_back: bool = Field(
+        False,
+        description="Whether previously created segments were deleted after failure",
+    )
+    error: str | None = Field(None, description="Error message when the thread failed")
+    error_type: str | None = Field(
+        None,
+        description="Exception type raised during failure",
+    )
 
 
 class DeletePostRequest(BaseModel):
@@ -60,6 +109,24 @@ class DeletePostResponse(BaseModel):
     """Response schema for post deletion."""
 
     deleted: bool = Field(..., description="Whether the post was successfully deleted")
+
+
+class RepostRequest(BaseModel):
+    """Request schema for reposting a post."""
+
+    post_id: str = Field(..., description="ID of the post to repost")
+
+
+class UndoRepostRequest(BaseModel):
+    """Request schema for undoing a repost."""
+
+    post_id: str = Field(..., description="ID of the post to undo repost")
+
+
+class RepostResponse(BaseModel):
+    """Response schema indicating repost state."""
+
+    reposted: bool = Field(..., description="Whether the authenticated user currently reposts the post")
 
 
 class GetPostRequest(BaseModel):
@@ -77,6 +144,18 @@ class SearchRecentPostsRequest(BaseModel):
         description="Maximum number of posts to return",
         ge=10,
         le=100,
+    )
+    expansions: list[str] | None = Field(
+        None,
+        description="List of expansions to request (e.g., author_id)",
+    )
+    tweet_fields: list[str] | None = Field(
+        None,
+        description="Additional tweet fields to request",
+    )
+    user_fields: list[str] | None = Field(
+        None,
+        description="User fields to request when expansions include author",
     )
 
 

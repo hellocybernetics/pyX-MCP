@@ -1,6 +1,12 @@
-"""
-Domain specific exception hierarchy for the x_client package.
-"""
+"""Domain specific exception hierarchy for the x_client package."""
+
+from __future__ import annotations
+
+from typing import Sequence, TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - runtime import guard
+    from x_client.models import Post
+
 
 class XClientError(Exception):
     """Base exception for all library errors."""
@@ -40,3 +46,22 @@ class MediaProcessingTimeout(ApiResponseError):
 
 class MediaProcessingFailed(ApiResponseError):
     """Raised when the API reports failure for an uploaded media asset."""
+
+
+class ThreadCreationError(XClientError):
+    """Raised when a thread fails to publish completely."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        posts: Sequence["Post"],
+        failed_index: int,
+        cause: Exception | None = None,
+        rolled_back: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.posts = list(posts)
+        self.failed_index = failed_index
+        self.cause = cause
+        self.rolled_back = rolled_back

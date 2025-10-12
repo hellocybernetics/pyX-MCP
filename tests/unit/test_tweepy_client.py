@@ -12,10 +12,12 @@ from x_client.exceptions import ApiResponseError, RateLimitExceeded
 
 class StubV2Client:
     """Stub for tweepy.Client (v2 API) - tweet operations."""
-    def __init__(self, *, create_result=None, tweet=None, search=None) -> None:
+
+    def __init__(self, *, create_result=None, tweet=None, search=None, retweet=None) -> None:
         self.create_result = create_result
-        self.post = tweet or {"id": "99", "text": "hello"}
+        self.tweet = tweet or {"id": "99", "text": "hello"}
         self.search = search or [{"id": "1", "text": "a"}]
+        self.retweet_result = retweet or {"retweeted": True}
         self.called_with: dict[str, tuple[tuple, dict]] = {}
         self._exception: Exception | None = None
 
@@ -45,6 +47,18 @@ class StubV2Client:
         if self._exception:
             raise self._exception
         return SimpleNamespace(data=self.search)
+
+    def retweet(self, **kwargs):
+        self.called_with["retweet"] = ((), kwargs)
+        if self._exception:
+            raise self._exception
+        return self.retweet_result
+
+    def unretweet(self, **kwargs):
+        self.called_with["unretweet"] = ((), kwargs)
+        if self._exception:
+            raise self._exception
+        return {"retweeted": False}
 
 
 class StubV1API:
@@ -181,3 +195,27 @@ def test_upload_media_strips_media_type_when_chunked() -> None:
     assert kwargs["media_category"] == "post_video"
     assert kwargs["chunked"] is True
     assert kwargs["file"] is file_obj
+
+
+def test_repost_post_invokes_v2_client() -> None:
+    v2_client = StubV2Client(retweet={"retweeted": True})
+    v1_api = StubV1API()
+    client = TweepyClient(v2_client, v1_api)  # type: ignore[arg-type]
+
+    response = client.repost_post("456")
+
+    assert response["retweeted"] is True
+    assert v2_client.called_with["retweet"][1]["tweet_id"] == "456"
+    assert v2_client.called_with["retweet"][1]["user_auth"] is True
+
+
+def test_undo_repost_invokes_v2_client() -> None:
+    v2_client = StubV2Client(retweet={"retweeted": True})
+    v1_api = StubV1API()
+    client = TweepyClient(v2_client, v1_api)  # type: ignore[arg-type]
+
+    response = client.undo_repost("789")
+
+    assert response["retweeted"] is False
+    assert v2_client.called_with["unretweet"][1]["tweet_id"] == "789"
+    assert v2_client.called_with["unretweet"][1]["user_auth"] is True

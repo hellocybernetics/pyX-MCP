@@ -58,6 +58,12 @@ class TweepyClient:
     def search_recent_posts(self, query: str, **kwargs: Any) -> Any:
         return self._invoke("search_recent_tweets", query, **kwargs)
 
+    def repost_post(self, post_id: str) -> Any:
+        return self._invoke("retweet", tweet_id=post_id, user_auth=True)
+
+    def undo_repost(self, post_id: str) -> Any:
+        return self._invoke("unretweet", tweet_id=post_id, user_auth=True)
+
     def upload_media(
         self,
         *,

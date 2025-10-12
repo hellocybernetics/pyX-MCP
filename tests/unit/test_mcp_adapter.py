@@ -26,8 +26,11 @@ from x_client.models import (
     MediaProcessingInfo,
     MediaUploadResult,
     Post,
+    RepostResult,
+    User,
 )
 from x_client.rate_limit import RateLimitInfo
+from x_client.services.post_service import PostService
 
 
 @pytest.fixture
@@ -197,7 +200,113 @@ def test_search_recent_posts_success(adapter, mock_post_service):
     mock_post_service.search_recent.assert_called_once_with(
         query="python",
         max_results=10,
+        expansions=None,
+        post_fields=None,
+        user_fields=None,
     )
+
+
+def test_search_recent_posts_with_author(adapter, mock_post_service):
+    mock_posts = [
+        Post(
+            id="1",
+            text="First post",
+            author_id="user1",
+            author=None,
+        )
+    ]
+    mock_posts[0].author = User(id="user1", name="User One", username="userone")
+    mock_post_service.search_recent.return_value = mock_posts
+
+    request = {
+        "query": "python",
+        "max_results": 10,
+        "expansions": ["author_id"],
+        "tweet_fields": ["created_at"],
+        "user_fields": ["username"],
+    }
+
+    result = adapter.search_recent_posts(request)
+
+    assert result["posts"][0]["author"]["username"] == "userone"
+    mock_post_service.search_recent.assert_called_once_with(
+        query="python",
+        max_results=10,
+        expansions=["author_id"],
+        post_fields=["created_at"],
+        user_fields=["username"],
+    )
+
+
+def test_create_thread_success(adapter, mock_post_service):
+    post = Post(id="1", text="Segment 1", author_id="user1")
+    thread_result = PostService.ThreadCreateResult(posts=[post])
+    mock_post_service.create_thread.return_value = thread_result
+
+    request = {"text": "Segment 1"}
+    response = adapter.create_thread(request)
+
+    assert response["succeeded"] is True
+    assert len(response["posts"]) == 1
+    mock_post_service.create_thread.assert_called_once_with(
+        text="Segment 1",
+        chunk_limit=280,
+        in_reply_to=None,
+        rollback_on_failure=True,
+    )
+
+
+def test_create_thread_failure(adapter, mock_post_service):
+    post = Post(id="1", text="Segment 1", author_id="user1")
+    error = ApiResponseError("failure")
+    thread_result = PostService.ThreadCreateResult(
+        posts=[post],
+        error=error,
+        failed_index=1,
+        rolled_back=False,
+    )
+    mock_post_service.create_thread.return_value = thread_result
+
+    request = {
+        "text": "Segment 1 Segment 2",
+        "chunk_limit": 140,
+        "in_reply_to": "base",
+        "rollback_on_failure": False,
+    }
+
+    response = adapter.create_thread(request)
+
+    assert response["succeeded"] is False
+    assert response["failed_index"] == 1
+    assert response["rolled_back"] is False
+    assert response["error_type"] == "ApiResponseError"
+    assert response["error"] == "failure"
+    mock_post_service.create_thread.assert_called_once_with(
+        text="Segment 1 Segment 2",
+        chunk_limit=140,
+        in_reply_to="base",
+        rollback_on_failure=False,
+    )
+
+
+def test_repost_post_success(adapter, mock_post_service):
+    mock_post_service.repost_post.return_value = RepostResult(reposted=True)
+    request = {"post_id": "123"}
+
+    result = adapter.repost_post(request)
+
+    assert result["reposted"] is True
+    mock_post_service.repost_post.assert_called_once_with("123")
+
+
+def test_undo_repost_success(adapter, mock_post_service):
+    mock_post_service.undo_repost.return_value = RepostResult(reposted=False)
+    request = {"post_id": "123"}
+
+    result = adapter.undo_repost(request)
+
+    assert result["reposted"] is False
+    mock_post_service.undo_repost.assert_called_once_with("123")
 
 
 # ============================================================================
@@ -399,7 +508,10 @@ def test_get_tool_schemas(adapter):
     # Verify all expected tools are present
     expected_tools = [
         "create_post",
+        "create_thread",
         "delete_post",
+        "repost_post",
+        "undo_repost",
         "get_post",
         "search_recent_posts",
         "upload_image",

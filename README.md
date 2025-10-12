@@ -7,6 +7,10 @@ X (Twitter) API と連携するための Python クライアントです。tweep
 - `.env` を用いた安全な認証情報管理と OAuth フロー統合
 - `PostService` / `MediaService` による高レベル API
 - `examples/create_post.py` による CLI からの投稿デモ
+- 長文スレッド投稿ユーティリティと自動リプライチェーン構築
+- リポスト／取り消し API と MCP ツール
+- 検索 API の expansions／fields 指定対応と著者情報解決
+- サービス層に組み込まれた構造化ログとイベントフック
 - **MCP (Model Context Protocol) 統合**: AI アシスタントから X API を操作可能
 
 ## 必要条件
@@ -73,6 +77,34 @@ post = post_service.create_post(
     text="Check out this image!",
     media_ids=[media_result.media_id]
 )
+
+# 5. 長文スレッド投稿
+thread = post_service.create_thread(
+    """Python 3.13 highlights... (long text)""",
+    chunk_limit=200,
+)
+for idx, segment_post in enumerate(thread.posts, start=1):
+    print(f"Segment {idx}: {segment_post.id}")
+if not thread.succeeded:
+    print("Thread failed", thread.error)
+
+# 6. リポスト操作
+repost_state = post_service.repost_post(post.id)
+print("Reposted:", repost_state.reposted)
+
+undo_state = post_service.undo_repost(post.id)
+print("Repost removed:", not undo_state.reposted)
+
+# 7. 著者情報付き検索
+search_results = post_service.search_recent(
+    "from:twitterdev",
+    expansions=["author_id"],
+    user_fields=["username", "verified"],
+    post_fields=["created_at"],
+)
+for item in search_results:
+    author = item.author.username if item.author else "unknown"
+    print(author, item.text)
 ```
 
 ## CLI で試す
@@ -90,9 +122,48 @@ python examples/create_post.py "Check out this video!" --video path/to/video.mp4
 
 # 別パスの .env を利用
 python examples/create_post.py "Hello with custom env" --dotenv /secure/path/.env
+
+# 長文スレッド投稿（chunk_limit=180 で自動分割）
+python examples/create_post.py "Long form update..." --thread --chunk-limit 180
+
+# ファイルからスレッドを投稿（UTF-8 テキストを想定）
+python examples/create_post.py --thread-file docs/thread_draft.txt
+
+# リポスト / リポストの取り消し
+python examples/create_post.py --repost 1234567890
+python examples/create_post.py --undo-repost 1234567890
 ```
 
 `examples/sample_image.png` をサンプル画像として同梱しているため、動作確認時には `--image examples/sample_image.png` を指定できます。
+
+スレッド投稿はテキストのみサポートしています（API 制約上メディア添付は不可）。`--chunk-limit` で 1 セグメントあたりの文字数上限を調整できます。`--thread-file` を指定すると Markdown/テキストファイルをそのままスレッドとして分割投稿します。
+
+リポスト操作は本文/メディア不要で、`--repost` で指定 ID をリポスト、`--undo-repost` で取り消します。
+
+## ロギングと可観測性
+
+`PostService` には構造化された INFO/DEBUG ログとイベントフックが標準で組み込まれています。`logging.basicConfig(level=logging.INFO)` を呼び出すだけで、スレッド投稿やリポストの進行状況が `post.thread.*` / `post.repost.*` といったイベント名で確認できます。
+
+```python
+import logging
+
+from x_client.config import ConfigManager
+from x_client.factory import XClientFactory
+from x_client.services.post_service import PostService
+
+logging.basicConfig(level=logging.INFO)
+
+client = XClientFactory.create_from_config(ConfigManager())
+
+def metrics_hook(event: str, payload: dict[str, object]) -> None:
+    # Prometheus / OpenTelemetry などへの連携ポイント
+    print("metrics", event, payload)
+
+post_service = PostService(client, event_hook=metrics_hook)
+post_service.create_post("observability ready!")
+```
+
+イベントフックは成功・失敗双方のイベントを単一コールバックへ集約するため、メトリクス送出や分散トレーシングとの連携が容易です。失敗時には `post.create.error` や `post.thread.error` が呼び出されるため、再試行戦略やアラート通知と組み合わせられます。
 
 ## MCP (Model Context Protocol) で利用する
 
@@ -125,6 +196,7 @@ adapter.create_post({"text": "Image post", "media_ids": [media["media_id"]]})
 ### 提供ツール
 
 - `create_post`, `delete_post`, `get_post`, `search_recent_posts`
+- `create_thread`, `repost_post`, `undo_repost`
 - `upload_image`（画像: JPEG/PNG/WebP/GIF, 最大 5MB）
 - `upload_video`（動画: MP4, 最大 512MB, チャンクアップロード対応）
 - `get_auth_status`（OAuth1 アクセストークンから `user_id` を抽出し、利用可能であればレート制限情報 `{limit, remaining, reset_at}` を返却）

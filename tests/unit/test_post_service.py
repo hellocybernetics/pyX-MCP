@@ -18,11 +18,28 @@ class FakePostClient:
         self.delete_response: dict[str, object] = {"deleted": True}
         self.post_response: dict[str, object] = {"id": "222", "text": "hi"}
         self.search_response: SimpleNamespace = SimpleNamespace(
-            data=[{"id": "333", "text": "search result"}]
+            data=[{"id": "333", "text": "search result", "author_id": "user1"}],
+            includes={
+                "users": [
+                    {"id": "user1", "name": "User One", "username": "userone"}
+                ]
+            },
         )
+        self.create_call_count = 0
+        self.fail_on_calls: set[int] = set()
+        self.create_history: list[dict[str, object]] = []
+        self.repost_response: dict[str, object] = {"reposted": True}
+        self.undo_repost_response: dict[str, object] = {"reposted": False}
+        self.repost_ids: list[str] = []
+        self.undo_repost_ids: list[str] = []
 
     def create_post(self, **kwargs):
+        self.create_call_count += 1
+        if self.create_call_count in self.fail_on_calls:
+            raise ApiResponseError("failed")
+
         self.create_kwargs = kwargs
+        self.create_history.append(kwargs)
         return self.create_response
 
     def delete_post(self, post_id):
@@ -36,6 +53,14 @@ class FakePostClient:
     def search_recent_posts(self, query, **kwargs):
         self.search_kwargs = {"query": query, **kwargs}
         return self.search_response
+
+    def repost_post(self, post_id):
+        self.repost_ids.append(post_id)
+        return self.repost_response
+
+    def undo_repost(self, post_id):
+        self.undo_repost_ids.append(post_id)
+        return self.undo_repost_response
 
 
 def test_create_post_builds_payload() -> None:
@@ -87,3 +112,144 @@ def test_search_recent_handles_empty_result() -> None:
     posts = service.search_recent("query")
 
     assert posts == []
+
+
+def test_search_recent_with_expansions_and_author() -> None:
+    client = FakePostClient()
+    service = PostService(client)
+
+    posts = service.search_recent(
+        "query",
+        max_results=25,
+        expansions=["author_id"],
+        post_fields=["created_at"],
+        user_fields=["username"],
+    )
+
+    assert client.search_kwargs == {
+        "query": "query",
+        "max_results": 25,
+        "expansions": ["author_id"],
+        "tweet_fields": ["created_at"],
+        "user_fields": ["username"],
+    }
+
+    assert len(posts) == 1
+    post = posts[0]
+    assert post.author is not None
+    assert post.author.username == "userone"
+
+
+def test_create_thread_success_builds_chain() -> None:
+    client = FakePostClient()
+    service = PostService(client)
+
+    result = service.create_thread("hello world " * 20, chunk_limit=30)
+
+    assert result.succeeded is True
+    assert len(result.posts) > 1
+    assert client.create_call_count == len(result.posts)
+
+    # Ensure subsequent posts reply to prior ID
+    for index, kwargs in enumerate(client.create_history):
+        if index == 0:
+            assert "reply" not in kwargs
+        else:
+            assert kwargs["reply"] == {"in_reply_to_post_id": result.posts[index - 1].id}
+
+
+def test_create_thread_rolls_back_on_failure() -> None:
+    client = FakePostClient()
+    client.fail_on_calls = {2}
+    service = PostService(client)
+
+    result = service.create_thread(["first", "second", "third"], chunk_limit=280)
+
+    assert result.succeeded is False
+    assert result.failed_index == 1
+    assert result.error is not None
+    # First post created and then deleted due to rollback
+    assert client.delete_ids == [result.posts[0].id]
+
+
+def test_repost_post_success() -> None:
+    client = FakePostClient()
+    service = PostService(client)
+
+    result = service.repost_post("999")
+
+    assert result.reposted is True
+    assert client.repost_ids == ["999"]
+
+
+def test_undo_repost_success() -> None:
+    client = FakePostClient()
+    service = PostService(client)
+
+    result = service.undo_repost("999")
+
+    assert result.reposted is False
+    assert client.undo_repost_ids == ["999"]
+
+
+def test_repost_post_failure_raises() -> None:
+    client = FakePostClient()
+    client.repost_response = {"reposted": False}
+    service = PostService(client)
+
+    with pytest.raises(ApiResponseError):
+        service.repost_post("999")
+
+
+def test_undo_repost_failure_raises() -> None:
+    client = FakePostClient()
+    client.undo_repost_response = {"reposted": True}
+    service = PostService(client)
+
+    with pytest.raises(ApiResponseError):
+        service.undo_repost("999")
+
+
+def test_create_post_emits_events() -> None:
+    client = FakePostClient()
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def hook(name: str, payload: dict[str, object]) -> None:
+        events.append((name, payload))
+
+    service = PostService(client, event_hook=hook)
+    post = service.create_post("observable text")
+
+    assert post.id == "111"
+    assert [name for name, _ in events] == [
+        "post.create.start",
+        "post.create.success",
+    ]
+
+
+def test_create_post_failure_emits_error_event() -> None:
+    client = FakePostClient()
+    client.fail_on_calls = {1}
+    events: list[tuple[str, dict[str, object]]] = []
+
+    service = PostService(client, event_hook=lambda name, payload: events.append((name, payload)))
+
+    with pytest.raises(ApiResponseError):
+        service.create_post("should fail")
+
+    assert [name for name, _ in events][-1] == "post.create.error"
+
+
+def test_create_thread_emits_segment_events() -> None:
+    client = FakePostClient()
+    events: list[str] = []
+
+    service = PostService(client, event_hook=lambda name, payload: events.append(name))
+
+    result = service.create_thread("segment " * 10, chunk_limit=10)
+
+    assert result.succeeded is True
+    assert events[0] == "post.thread.start"
+    assert "post.thread.success" in events
+    segment_events = [name for name in events if name == "post.thread.segment_success"]
+    assert len(segment_events) == len(result.posts)

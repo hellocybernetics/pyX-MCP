@@ -29,6 +29,7 @@ from x_client.exceptions import (
 )
 from x_client.factory import XClientFactory
 from x_client.integrations.schema import (
+    AuthorResponse,
     DeletePostRequest,
     DeletePostResponse,
     ErrorResponse,
@@ -37,10 +38,15 @@ from x_client.integrations.schema import (
     GetPostRequest,
     MediaUploadResponse,
     CreatePostRequest,
+    CreateThreadRequest,
+    CreateThreadResponse,
     RateLimitInfoResponse,
     SearchRecentPostsRequest,
     SearchRecentPostsResponse,
     PostResponse,
+    RepostRequest,
+    UndoRepostRequest,
+    RepostResponse,
     UploadImageRequest,
     UploadVideoRequest,
 )
@@ -110,11 +116,36 @@ class XMCPAdapter:
                 reply_settings=validated.reply_settings,
             )
 
-            return PostResponse(
-                id=post.id,
-                text=post.text,
-                author_id=post.author_id,
-                created_at=post.created_at.isoformat() if post.created_at else None,
+            return self._serialize_post(post).model_dump(exclude_none=True)
+
+        except ValidationError as e:
+            return self._convert_validation_error(e)
+        except XClientError as e:
+            return self._convert_exception(e)
+
+    def create_thread(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Create a thread by splitting text into multiple posts."""
+
+        try:
+            validated = CreateThreadRequest.model_validate(request)
+
+            result = self.post_service.create_thread(
+                text=validated.text,
+                chunk_limit=validated.chunk_limit,
+                in_reply_to=validated.in_reply_to,
+                rollback_on_failure=validated.rollback_on_failure,
+            )
+
+            post_responses = [self._serialize_post(post) for post in result.posts]
+            error = result.error
+
+            return CreateThreadResponse(
+                posts=post_responses,
+                succeeded=result.succeeded,
+                failed_index=result.failed_index,
+                rolled_back=result.rolled_back,
+                error=str(error) if error else None,
+                error_type=error.__class__.__name__ if error else None,
             ).model_dump(exclude_none=True)
 
         except ValidationError as e:
@@ -162,13 +193,7 @@ class XMCPAdapter:
         try:
             validated = GetPostRequest.model_validate(request)
             post = self.post_service.get_post(validated.post_id)
-
-            return PostResponse(
-                id=post.id,
-                text=post.text,
-                author_id=post.author_id,
-                created_at=post.created_at.isoformat() if post.created_at else None,
-            ).model_dump(exclude_none=True)
+            return self._serialize_post(post).model_dump(exclude_none=True)
 
         except ValidationError as e:
             return self._convert_validation_error(e)
@@ -193,19 +218,42 @@ class XMCPAdapter:
             posts = self.post_service.search_recent(
                 query=validated.query,
                 max_results=validated.max_results,
+                expansions=validated.expansions,
+                post_fields=validated.tweet_fields,
+                user_fields=validated.user_fields,
             )
 
-            post_responses = [
-                PostResponse(
-                    id=post.id,
-                    text=post.text,
-                    author_id=post.author_id,
-                    created_at=post.created_at.isoformat() if post.created_at else None,
-                )
-                for post in posts
-            ]
+            post_responses = [self._serialize_post(post) for post in posts]
 
             return SearchRecentPostsResponse(posts=post_responses).model_dump()
+
+        except ValidationError as e:
+            return self._convert_validation_error(e)
+        except XClientError as e:
+            return self._convert_exception(e)
+
+    def repost_post(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Repost a post on behalf of the authenticated user."""
+
+        try:
+            validated = RepostRequest.model_validate(request)
+            result = self.post_service.repost_post(validated.post_id)
+
+            return RepostResponse(reposted=result.reposted).model_dump()
+
+        except ValidationError as e:
+            return self._convert_validation_error(e)
+        except XClientError as e:
+            return self._convert_exception(e)
+
+    def undo_repost(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Undo a previously performed repost."""
+
+        try:
+            validated = UndoRepostRequest.model_validate(request)
+            result = self.post_service.undo_repost(validated.post_id)
+
+            return RepostResponse(reposted=result.reposted).model_dump()
 
         except ValidationError as e:
             return self._convert_validation_error(e)
@@ -370,6 +418,23 @@ class XMCPAdapter:
             reset_at=reset_iso,
         )
 
+    def _serialize_post(self, post: Post) -> PostResponse:
+        author = None
+        if post.author is not None:
+            author = AuthorResponse(
+                id=post.author.id,
+                name=post.author.name,
+                username=post.author.username,
+            )
+
+        return PostResponse(
+            id=post.id,
+            text=post.text,
+            author_id=post.author_id,
+            author=author,
+            created_at=post.created_at.isoformat() if post.created_at else None,
+        )
+
     def _convert_media_result(self, result: Any) -> dict[str, Any]:
         """Convert MediaUploadResult to MediaUploadResponse schema."""
         processing_info = None
@@ -457,6 +522,21 @@ class XMCPAdapter:
                 "description": "Delete a post by ID",
                 "input_schema": DeletePostRequest.model_json_schema(),
                 "output_schema": DeletePostResponse.model_json_schema(),
+            },
+            "create_thread": {
+                "description": "Create a multi-post thread from long text",
+                "input_schema": CreateThreadRequest.model_json_schema(),
+                "output_schema": CreateThreadResponse.model_json_schema(),
+            },
+            "repost_post": {
+                "description": "Repost a post by ID",
+                "input_schema": RepostRequest.model_json_schema(),
+                "output_schema": RepostResponse.model_json_schema(),
+            },
+            "undo_repost": {
+                "description": "Undo an existing repost by ID",
+                "input_schema": UndoRepostRequest.model_json_schema(),
+                "output_schema": RepostResponse.model_json_schema(),
             },
             "get_post": {
                 "description": "Retrieve a specific post by ID",
