@@ -7,6 +7,7 @@ Twitter(X) API と連携するための Python クライアントです。tweepy
 - `.env` を用いた安全な認証情報管理と OAuth フロー統合
 - `TweetService` / `MediaService` による高レベル API
 - `examples/post_tweet.py` による CLI からの投稿デモ
+- **MCP (Model Context Protocol) 統合**: AI アシスタントから Twitter API を操作可能
 
 ## 必要条件
 - Python 3.13 以上
@@ -93,10 +94,61 @@ python examples/post_tweet.py "Hello with custom env" --dotenv /secure/path/.env
 
 `examples/sample_image.png` をサンプル画像として同梱しているため、動作確認時には `--image examples/sample_image.png` を指定できます。
 
-## 次のアクション例
-開発ロードマップや詳細な設計は `docs/` ディレクトリを参照してください。主に以下のドキュメントを用意しています。
-- `docs/twitter_api_design.md`: アーキテクチャ設計、サービス分割、エラーハンドリング方針など
-- `docs/development_status.md`: スプリント進捗や今後のタスク
+## MCP (Model Context Protocol) で利用する
+
+このライブラリは MCP サーバーとして AI アシスタント（Claude など）から利用できます。サービス層を再利用したアダプタにより、自然言語からツイート投稿やメディアアップロードを行えます。
+
+### セットアップ
+1. `.env` または環境変数に Twitter API 資格情報を設定する（`TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET` など）。
+2. `from twitter_client.integrations.mcp_adapter import TwitterMCPAdapter` をインポートし、`adapter = TwitterMCPAdapter()` で初期化する。
+3. MCP ホストにツール定義を登録し、AI アシスタントから呼び出せるようにする。`adapter.get_tool_schemas()` で各ツールの JSON Schema を取得可能。
+
+アーキテクチャ構成：
+```
+AI Assistant ↔ MCP ↔ TwitterMCPAdapter ↔ Service Layer ↔ TweepyClient ↔ Twitter API
+```
+
+### 代表的な呼び出し例
+
+```python
+from twitter_client.integrations.mcp_adapter import TwitterMCPAdapter
+
+adapter = TwitterMCPAdapter()  # 認証情報は ConfigManager が自動読み込み
+
+tweet = adapter.post_tweet({"text": "Hello from MCP!"})
+print(tweet)
+
+media = adapter.upload_image({"path": "/path/to/image.png"})
+adapter.post_tweet({"text": "Image tweet", "media_ids": [media["media_id"]]})
+```
+
+### 提供ツール
+
+- `post_tweet`, `delete_tweet`, `get_tweet`, `search_recent_tweets`
+- `upload_image`（画像: JPEG/PNG/WebP/GIF, 最大 5MB）
+- `upload_video`（動画: MP4, 最大 512MB, チャンクアップロード対応）
+- `get_auth_status`（OAuth1 アクセストークンから `user_id` を抽出し、利用可能であればレート制限情報 `{limit, remaining, reset_at}` を返却）
+
+### エラーハンドリング
+- `ConfigurationError`: 認証情報不足。`.env` と環境変数を確認。
+- `AuthenticationError`: トークン失効。OAuth フローを再実行。
+- `RateLimitExceeded`: レート制限到達。`reset_at` を参照し、バックオフを実施。
+- `MediaProcessingTimeout` / `MediaProcessingFailed`: 動画処理が完了しない場合。`timeout` や動画品質を調整。
+
+### トラブルシューティング
+- **Missing credentials**: `echo $TWITTER_API_KEY` などで環境変数を確認し、`.env` が 0o600 で保存されているか確認する。
+- **Invalid token**: `python examples/post_tweet.py "test"` を実行して OAuth フローを復旧。
+- **Video timeout**: `upload_video` の `timeout` を延長するか、`ffmpeg` で再エンコードする。
+
+### テスト
+```bash
+uv run pytest tests/unit/test_mcp_adapter.py -v
+uv run pytest tests/integration/test_mcp_workflow.py -v
+```
+
+## ドキュメント
+
+詳細な設計・計画や既知の懸念点は `docs/twitter_api_design.md` を参照してください（プロジェクト内ドキュメントはこの1ファイルに統合されています）。
 
 ## テスト実行
 ```bash
