@@ -1,5 +1,5 @@
 """
-twitter_client package scaffolding.
+x_client package scaffolding.
 
 This module exposes the public entry points that higher-level applications
 will import. It intentionally remains minimal at this stage and will be
@@ -26,6 +26,6 @@ def __getattr__(name: str):
     guidelines.
     """
     raise AttributeError(
-        f"Module attribute '{name}' is not yet implemented in twitter_client."
+        f"Module attribute '{name}' is not yet implemented in x_client."
     )
 

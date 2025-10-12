@@ -1,7 +1,7 @@
 [project]
-name = "twitter"
+name = "x"
 version = "0.1.0"
-description = "Twitter API client library with tweepy and pydantic"
+description = "X (Twitter) API client library with tweepy and pydantic"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

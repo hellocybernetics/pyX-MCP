@@ -9,8 +9,8 @@ from typing import Callable, Protocol
 
 import tweepy
 
-from twitter_client.config import ConfigManager, TwitterCredentials
-from twitter_client.exceptions import AuthenticationError, ConfigurationError
+from x_client.config import ConfigManager, XCredentials
+from x_client.exceptions import AuthenticationError, ConfigurationError
 
 
 class OAuthCallback(Protocol):
@@ -115,9 +115,9 @@ class OAuthManager:
         return self.start_oauth1_flow(callback)
 
     def _persist_tokens(
-        self, base_credentials: TwitterCredentials, tokens: OAuthTokens
+        self, base_credentials: XCredentials, tokens: OAuthTokens
     ) -> None:
-        combined = TwitterCredentials(
+        combined = XCredentials(
             api_key=base_credentials.api_key,
             api_secret=base_credentials.api_secret,
             bearer_token=base_credentials.bearer_token,

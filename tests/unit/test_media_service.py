@@ -5,13 +5,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from twitter_client.exceptions import (
+from x_client.exceptions import (
     MediaProcessingFailed,
     MediaProcessingTimeout,
     MediaValidationError,
 )
-from twitter_client.models import MediaUploadResult
-from twitter_client.services.media_service import IMAGE_MAX_BYTES, MediaService
+from x_client.models import MediaUploadResult
+from x_client.services.media_service import IMAGE_MAX_BYTES, MediaService
 
 
 class FakeMediaClient:
@@ -61,7 +61,7 @@ def test_upload_image_validates_and_returns_result(tmp_path: Path) -> None:
     result = service.upload_image(file_path)
 
     assert result.media_id == "1"
-    assert client.upload_calls[0]["media_category"] == "tweet_image"
+    assert client.upload_calls[0]["media_category"] == "post_image"
     assert client.upload_calls[0]["mime_type"] == "image/png"
     assert client.upload_calls[0]["chunked"] is False  # Images don't need chunked
 
@@ -133,8 +133,8 @@ def test_upload_video_times_out_when_processing_hangs(tmp_path: Path) -> None:
         service.upload_video(file_path)
 
 
-def test_upload_gif_routes_to_tweet_gif_with_chunked(tmp_path: Path) -> None:
-    """GIF images are automatically routed to tweet_gif category with chunked upload."""
+def test_upload_gif_routes_to_post_gif_with_chunked(tmp_path: Path) -> None:
+    """GIF images are automatically routed to post_gif category with chunked upload."""
     file_path = tmp_path / "animation.gif"
     _write_file(file_path, 1024)
     upload_response = {
@@ -148,15 +148,15 @@ def test_upload_gif_routes_to_tweet_gif_with_chunked(tmp_path: Path) -> None:
     result = service.upload_image(file_path)
 
     assert result.media_id == "123"
-    # Verify GIF is routed to tweet_gif category (not tweet_image)
-    assert client.upload_calls[0]["media_category"] == "tweet_gif"
+    # Verify GIF is routed to post_gif category (not post_image)
+    assert client.upload_calls[0]["media_category"] == "post_gif"
     assert client.upload_calls[0]["mime_type"] == "image/gif"
     # Verify chunked upload is enabled for GIFs
     assert client.upload_calls[0]["chunked"] is True
 
 
 def test_upload_gif_ignores_media_category_parameter(tmp_path: Path) -> None:
-    """GIF images ignore media_category parameter and always use tweet_gif."""
+    """GIF images ignore media_category parameter and always use post_gif."""
     file_path = tmp_path / "animation.gif"
     _write_file(file_path, 1024)
     upload_response = {
@@ -166,12 +166,12 @@ def test_upload_gif_ignores_media_category_parameter(tmp_path: Path) -> None:
     client = FakeMediaClient(upload_response=upload_response)
     service = MediaService(client, sleep=lambda _: None)
 
-    # User explicitly passes tweet_image, but GIF should override to tweet_gif
-    result = service.upload_image(file_path, media_category="tweet_image")
+    # User explicitly passes post_image, but GIF should override to post_gif
+    result = service.upload_image(file_path, media_category="post_image")
 
     assert result.media_id == "456"
     # Verify parameter is ignored for GIFs
-    assert client.upload_calls[0]["media_category"] == "tweet_gif"
+    assert client.upload_calls[0]["media_category"] == "post_gif"
     assert client.upload_calls[0]["chunked"] is True
 
 

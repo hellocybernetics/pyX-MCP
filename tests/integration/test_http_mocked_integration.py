@@ -10,11 +10,11 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 import responses
 
-from twitter_client.config import ConfigManager, TwitterCredentials
-from twitter_client.exceptions import MediaProcessingFailed, MediaProcessingTimeout
-from twitter_client.factory import TwitterClientFactory
-from twitter_client.services.media_service import MediaService
-from twitter_client.services.tweet_service import TweetService
+from x_client.config import ConfigManager, XCredentials
+from x_client.exceptions import MediaProcessingFailed, MediaProcessingTimeout
+from x_client.factory import XClientFactory
+from x_client.services.media_service import MediaService
+from x_client.services.post_service import PostService
 
 from .fixtures import (
     MEDIA_UPLOAD_IMAGE_RESPONSE,
@@ -121,9 +121,9 @@ def _register_chunked_video_flow(
 
 
 @pytest.fixture
-def credentials() -> TwitterCredentials:
+def credentials() -> XCredentials:
     """Provide test credentials."""
-    return TwitterCredentials(
+    return XCredentials(
         api_key="test_api_key",
         api_secret="test_api_secret",
         access_token="test_access_token",
@@ -149,8 +149,8 @@ def mock_video_file(tmp_path: Path) -> Path:
 
 
 @responses.activate
-def test_create_tweet_with_real_http_mocking(credentials: TwitterCredentials) -> None:
-    """Integration: Create tweet with actual HTTP request mocking."""
+def test_create_post_with_real_http_mocking(credentials: XCredentials) -> None:
+    """Integration: Create post with actual HTTP request mocking."""
     # Mock Twitter API v2 endpoint
     responses.add(
         responses.POST,
@@ -160,15 +160,15 @@ def test_create_tweet_with_real_http_mocking(credentials: TwitterCredentials) ->
     )
 
     # Create client and service
-    client = TwitterClientFactory.create_from_credentials(credentials)
-    tweet_service = TweetService(client)
+    client = XClientFactory.create_from_credentials(credentials)
+    post_service = PostService(client)
 
-    # Create tweet
-    tweet = tweet_service.create_tweet(text="Hello from HTTP mocked test!")
+    # Create post
+    post = post_service.create_post(text="Hello from HTTP mocked test!")
 
     # Verify response
-    assert tweet.id == "1234567890"
-    assert tweet.text == "Hello from integration test!"
+    assert post.id == "1234567890"
+    assert post.text == "Hello from integration test!"
 
     # Verify HTTP call was made
     assert len(responses.calls) == 1
@@ -177,7 +177,7 @@ def test_create_tweet_with_real_http_mocking(credentials: TwitterCredentials) ->
 
 @responses.activate
 def test_upload_image_with_http_mocking(
-    credentials: TwitterCredentials,
+    credentials: XCredentials,
     mock_image_file: Path,
 ) -> None:
     """Integration: Upload image with HTTP request mocking."""
@@ -190,7 +190,7 @@ def test_upload_image_with_http_mocking(
     )
 
     # Create client and service
-    client = TwitterClientFactory.create_from_credentials(credentials)
+    client = XClientFactory.create_from_credentials(credentials)
     media_service = MediaService(client)
 
     # Upload image
@@ -206,7 +206,7 @@ def test_upload_image_with_http_mocking(
 
 @responses.activate
 def test_upload_video_with_chunked_upload_mocking(
-    credentials: TwitterCredentials,
+    credentials: XCredentials,
     mock_video_file: Path,
 ) -> None:
     """Integration: Upload video with chunked upload HTTP mocking."""
@@ -216,7 +216,7 @@ def test_upload_video_with_chunked_upload_mocking(
     )
 
     # Create client and service with minimal polling delay
-    client = TwitterClientFactory.create_from_credentials(credentials)
+    client = XClientFactory.create_from_credentials(credentials)
     media_service = MediaService(client, poll_interval=0, timeout=10, sleep=lambda _: None)
 
     # Upload video
@@ -240,7 +240,7 @@ def test_upload_video_with_chunked_upload_mocking(
 
 @responses.activate
 def test_upload_video_timeout_with_http_mocking(
-    credentials: TwitterCredentials,
+    credentials: XCredentials,
     mock_video_file: Path,
 ) -> None:
     """Integration: MediaService raises timeout when processing never completes."""
@@ -249,7 +249,7 @@ def test_upload_video_timeout_with_http_mocking(
         status_sequence=[MEDIA_UPLOAD_VIDEO_STATUS_PROCESSING],
     )
 
-    client = TwitterClientFactory.create_from_credentials(credentials)
+    client = XClientFactory.create_from_credentials(credentials)
     media_service = MediaService(client, poll_interval=0, timeout=0.5, sleep=lambda _: None)
 
     with pytest.raises(MediaProcessingTimeout):
@@ -258,7 +258,7 @@ def test_upload_video_timeout_with_http_mocking(
 
 @responses.activate
 def test_upload_video_failure_with_http_mocking(
-    credentials: TwitterCredentials,
+    credentials: XCredentials,
     mock_video_file: Path,
 ) -> None:
     """Integration: MediaService raises exception when processing reports failure."""
@@ -268,7 +268,7 @@ def test_upload_video_failure_with_http_mocking(
         finalize_response=MEDIA_UPLOAD_VIDEO_FINALIZE_RESPONSE,
     )
 
-    client = TwitterClientFactory.create_from_credentials(credentials)
+    client = XClientFactory.create_from_credentials(credentials)
     media_service = MediaService(client, poll_interval=0, timeout=5, sleep=lambda _: None)
 
     with pytest.raises(MediaProcessingFailed):
@@ -276,11 +276,11 @@ def test_upload_video_failure_with_http_mocking(
 
 
 @responses.activate
-def test_end_to_end_tweet_with_image(
-    credentials: TwitterCredentials,
+def test_end_to_end_post_with_image(
+    credentials: XCredentials,
     mock_image_file: Path,
 ) -> None:
-    """Integration: End-to-end tweet creation with image upload."""
+    """Integration: End-to-end post creation with image upload."""
     # Mock media upload
     responses.add(
         responses.POST,
@@ -289,39 +289,39 @@ def test_end_to_end_tweet_with_image(
         status=200,
     )
 
-    # Mock tweet creation
-    tweet_response_with_media = {
+    # Mock post creation
+    post_response_with_media = {
         "data": {
             "id": "9999999999",
             "text": "Check out this image!",
-            "edit_history_tweet_ids": ["9999999999"],
+            "edit_history_post_ids": ["9999999999"],
         }
     }
     responses.add(
         responses.POST,
         "https://api.twitter.com/2/tweets",
-        json=tweet_response_with_media,
+        json=post_response_with_media,
         status=201,
     )
 
     # Create services
-    client = TwitterClientFactory.create_from_credentials(credentials)
+    client = XClientFactory.create_from_credentials(credentials)
     media_service = MediaService(client)
-    tweet_service = TweetService(client)
+    post_service = PostService(client)
 
     # Upload image
     media_result = media_service.upload_image(mock_image_file)
 
-    # Create tweet with media
-    tweet = tweet_service.create_tweet(
+    # Create post with media
+    post = post_service.create_post(
         text="Check out this image!",
         media_ids=[media_result.media_id],
     )
 
     # Verify end-to-end flow
     assert media_result.media_id == "1234567890123456789"
-    assert tweet.id == "9999999999"
-    assert len(responses.calls) == 2  # Media upload + tweet creation
+    assert post.id == "9999999999"
+    assert len(responses.calls) == 2  # Media upload + post creation
 
 
 @responses.activate
@@ -332,11 +332,11 @@ def test_factory_initialization_with_config(tmp_path: Path) -> None:
     config_file.write_text(
         "\n".join(
             [
-                "TWITTER_API_KEY=test_key",
-                "TWITTER_API_SECRET=test_secret",
-                "TWITTER_ACCESS_TOKEN=test_token",
-                "TWITTER_ACCESS_TOKEN_SECRET=test_token_secret",
-                "TWITTER_BEARER_TOKEN=test_bearer",
+                "X_API_KEY=test_key",
+                "X_API_SECRET=test_secret",
+                "X_ACCESS_TOKEN=test_token",
+                "X_ACCESS_TOKEN_SECRET=test_token_secret",
+                "X_BEARER_TOKEN=test_bearer",
             ]
         )
     )
@@ -351,11 +351,11 @@ def test_factory_initialization_with_config(tmp_path: Path) -> None:
 
     # Load config and create client
     config = ConfigManager(dotenv_path=config_file)
-    client = TwitterClientFactory.create_from_config(config)
-    tweet_service = TweetService(client)
+    client = XClientFactory.create_from_config(config)
+    post_service = PostService(client)
 
-    # Create tweet to verify client works
-    tweet = tweet_service.create_tweet(text="Factory test")
+    # Create post to verify client works
+    post = post_service.create_post(text="Factory test")
 
-    assert tweet.id == "1234567890"
+    assert post.id == "1234567890"
     assert len(responses.calls) == 1

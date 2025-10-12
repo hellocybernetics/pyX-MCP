@@ -1,5 +1,5 @@
 """
-Pydantic models for Twitter API responses used by twitter_client.
+Pydantic models for X (Twitter) API responses used by x_client.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ def _to_mapping(payload: Any) -> Mapping[str, Any]:
     raise TypeError(f"Cannot convert payload of type {type(payload)!r} to mapping.")
 
 
-class Tweet(BaseModel):
-    """Normalized representation of a tweet."""
+class Post(BaseModel):
+    """Normalized representation of a post."""
 
     id: str
     text: str | None = None
@@ -31,17 +31,17 @@ class Tweet(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @classmethod
-    def from_api(cls, payload: Any) -> "Tweet":
+    def from_api(cls, payload: Any) -> "Post":
         return cls.model_validate(_to_mapping(payload))
 
 
-class TweetDeleteResult(BaseModel):
-    """Represents the outcome of a delete tweet call."""
+class PostDeleteResult(BaseModel):
+    """Represents the outcome of a delete post call."""
 
     deleted: bool
 
     @classmethod
-    def from_api(cls, payload: Any) -> "TweetDeleteResult":
+    def from_api(cls, payload: Any) -> "PostDeleteResult":
         return cls.model_validate(_to_mapping(payload))
 
 

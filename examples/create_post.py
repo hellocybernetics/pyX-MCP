@@ -1,30 +1,30 @@
 #!/usr/bin/env python
 """
-Example: Post a tweet with optional media using twitter_client.
+Example: Post to X (Twitter) with optional media using x_client.
 
 This example demonstrates:
 - Loading credentials from environment or .env file
 - Creating a client using the factory
 - Uploading media (image or video)
-- Creating a tweet with or without media
+- Creating a post with or without media
 
 Usage:
-    # Text-only tweet
-    python examples/post_tweet.py "Hello from twitter_client!"
+    # Text-only post
+    python examples/create_post.py "Hello from x_client!"
 
-    # Tweet with image
-    python examples/post_tweet.py "Check out this image!" --image path/to/image.png
+    # Post with image
+    python examples/create_post.py "Check out this image!" --image path/to/image.png
 
-    # Tweet with video
-    python examples/post_tweet.py "Check out this video!" --video path/to/video.mp4
+    # Post with video
+    python examples/create_post.py "Check out this video!" --video path/to/video.mp4
 
 Requirements:
     Set environment variables or create a .env file with:
-    - TWITTER_API_KEY
-    - TWITTER_API_SECRET
-    - TWITTER_ACCESS_TOKEN
-    - TWITTER_ACCESS_TOKEN_SECRET
-    - TWITTER_BEARER_TOKEN (optional, but recommended for v2 API)
+    - X_API_KEY
+    - X_API_SECRET
+    - X_ACCESS_TOKEN
+    - X_ACCESS_TOKEN_SECRET
+    - X_BEARER_TOKEN (optional, but recommended for v2 API)
 """
 
 from __future__ import annotations
@@ -33,28 +33,28 @@ import argparse
 import sys
 from pathlib import Path
 
-# Ensure project root is on sys.path when running as a script (e.g. python examples/post_tweet.py)
+# Ensure project root is on sys.path when running as a script (e.g. python examples/create_post.py)
 if __package__ is None:  # pragma: no cover - runtime convenience
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from twitter_client.config import ConfigManager
-from twitter_client.exceptions import (
+from x_client.config import ConfigManager
+from x_client.exceptions import (
     ConfigurationError,
     MediaProcessingFailed,
     MediaValidationError,
-    TwitterClientError,
+    XClientError,
 )
-from twitter_client.factory import TwitterClientFactory
-from twitter_client.services.media_service import MediaService
-from twitter_client.services.tweet_service import TweetService
+from x_client.factory import XClientFactory
+from x_client.services.media_service import MediaService
+from x_client.services.post_service import PostService
 
 
 def main() -> int:
     """Main entry point for the example."""
     parser = argparse.ArgumentParser(
-        description="Post a tweet with optional media attachment"
+        description="Post to X with optional media attachment"
     )
-    parser.add_argument("text", help="Tweet text content")
+    parser.add_argument("text", help="Post text content")
     parser.add_argument(
         "--image",
         type=Path,
@@ -75,7 +75,7 @@ def main() -> int:
 
     # Validate arguments
     if args.image and args.video:
-        print("Error: Cannot attach both image and video to a single tweet")
+        print("Error: Cannot attach both image and video to a single post")
         return 1
 
     try:
@@ -86,12 +86,12 @@ def main() -> int:
         print("✅ Credentials loaded")
 
         # Step 2: Create client using factory
-        print("Initializing Twitter client...")
-        client = TwitterClientFactory.create_from_credentials(credentials)
+        print("Initializing X client...")
+        client = XClientFactory.create_from_credentials(credentials)
         print("✅ Client initialized (dual-client: v2 + v1.1)")
 
         # Step 3: Initialize services
-        tweet_service = TweetService(client)
+        post_service = PostService(client)
         media_service = MediaService(client)
 
         # Step 4: Upload media if provided
@@ -113,28 +113,28 @@ def main() -> int:
                     f"   Processing status: {result.processing_info.state}"
                 )
 
-        # Step 5: Create tweet
-        print(f"Creating tweet: '{args.text}'")
+        # Step 5: Create post
+        print(f"Creating post: '{args.text}'")
         if media_id:
-            tweet = tweet_service.create_tweet(
+            post = post_service.create_post(
                 text=args.text, media_ids=[media_id]
             )
-            print(f"✅ Tweet created with media: {tweet.id}")
+            print(f"✅ Post created with media: {post.id}")
         else:
-            tweet = tweet_service.create_tweet(text=args.text)
-            print(f"✅ Tweet created: {tweet.id}")
+            post = post_service.create_post(text=args.text)
+            print(f"✅ Post created: {post.id}")
 
-        print(f"\n🎉 Success! Tweet URL: https://twitter.com/i/web/status/{tweet.id}")
+        print(f"\n🎉 Success! Post URL: https://x.com/i/web/status/{post.id}")
         return 0
 
     except ConfigurationError as e:
         print(f"❌ Configuration error: {e}")
         print("\nPlease set environment variables or create a .env file:")
-        print("  - TWITTER_API_KEY")
-        print("  - TWITTER_API_SECRET")
-        print("  - TWITTER_ACCESS_TOKEN")
-        print("  - TWITTER_ACCESS_TOKEN_SECRET")
-        print("  - TWITTER_BEARER_TOKEN (optional)")
+        print("  - X_API_KEY")
+        print("  - X_API_SECRET")
+        print("  - X_ACCESS_TOKEN")
+        print("  - X_ACCESS_TOKEN_SECRET")
+        print("  - X_BEARER_TOKEN (optional)")
         return 1
 
     except MediaValidationError as e:
@@ -146,12 +146,12 @@ def main() -> int:
 
     except MediaProcessingFailed as e:
         print(f"❌ Media processing failed: {e}")
-        print("\nTwitter's media processing encountered an error.")
+        print("\nX's media processing encountered an error.")
         print("Please check the file format and encoding.")
         return 1
 
-    except TwitterClientError as e:
-        print(f"❌ Twitter API error: {e}")
+    except XClientError as e:
+        print(f"❌ X API error: {e}")
         return 1
 
     except Exception as e:

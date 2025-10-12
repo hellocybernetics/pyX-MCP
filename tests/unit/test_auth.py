@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 import tweepy
 
-from twitter_client.auth import OAuthManager, OAuthTokens
-from twitter_client.config import ConfigManager
-from twitter_client.exceptions import AuthenticationError, ConfigurationError
+from x_client.auth import OAuthManager, OAuthTokens
+from x_client.config import ConfigManager
+from x_client.exceptions import AuthenticationError, ConfigurationError
 
 
 class DummyOAuthHandler:
@@ -27,10 +27,10 @@ class DummyOAuthHandler:
 
 def test_ensure_oauth1_token_returns_cached_tokens(tmp_path) -> None:
     env = {
-        "TWITTER_API_KEY": "api-key",
-        "TWITTER_API_SECRET": "api-secret",
-        "TWITTER_ACCESS_TOKEN": "cached-access",
-        "TWITTER_ACCESS_TOKEN_SECRET": "cached-secret",
+        "X_API_KEY": "api-key",
+        "X_API_SECRET": "api-secret",
+        "X_ACCESS_TOKEN": "cached-access",
+        "X_ACCESS_TOKEN_SECRET": "cached-secret",
     }
     manager = ConfigManager(env=env, dotenv_path=tmp_path / ".env")
     oauth = OAuthManager(manager)
@@ -41,8 +41,8 @@ def test_ensure_oauth1_token_returns_cached_tokens(tmp_path) -> None:
 
 def test_start_oauth1_flow_persists_tokens(tmp_path) -> None:
     env = {
-        "TWITTER_API_KEY": "api-key",
-        "TWITTER_API_SECRET": "api-secret",
+        "X_API_KEY": "api-key",
+        "X_API_SECRET": "api-secret",
     }
     dotenv_path = tmp_path / ".env"
     manager = ConfigManager(env=env, dotenv_path=dotenv_path)
@@ -64,8 +64,8 @@ def test_start_oauth1_flow_persists_tokens(tmp_path) -> None:
 
 def test_start_oauth1_flow_raises_on_auth_failure(tmp_path) -> None:
     env = {
-        "TWITTER_API_KEY": "api-key",
-        "TWITTER_API_SECRET": "api-secret",
+        "X_API_KEY": "api-key",
+        "X_API_SECRET": "api-secret",
     }
     manager = ConfigManager(env=env, dotenv_path=tmp_path / ".env")
 
@@ -85,8 +85,8 @@ def test_start_oauth1_flow_raises_on_auth_failure(tmp_path) -> None:
 def test_refresh_token_requires_callback(tmp_path) -> None:
     manager = ConfigManager(
         env={
-            "TWITTER_API_KEY": "api-key",
-            "TWITTER_API_SECRET": "api-secret",
+            "X_API_KEY": "api-key",
+            "X_API_SECRET": "api-secret",
         },
         dotenv_path=tmp_path / ".env",
     )

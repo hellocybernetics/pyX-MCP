@@ -1,5 +1,5 @@
 """
-Media upload workflows wrapping Twitter's chunked upload process.
+Media upload workflows wrapping X's chunked upload process.
 """
 
 from __future__ import annotations
@@ -10,12 +10,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Protocol
 
-from twitter_client.exceptions import (
+from x_client.exceptions import (
     MediaProcessingFailed,
     MediaProcessingTimeout,
     MediaValidationError,
 )
-from twitter_client.models import MediaUploadResult
+from x_client.models import MediaUploadResult
 
 IMAGE_MAX_BYTES = 5 * 1024 * 1024
 VIDEO_MAX_BYTES = 512 * 1024 * 1024
@@ -49,16 +49,16 @@ class MediaService:
     timeout: float = 60.0
     sleep: Callable[[float], None] = field(default=time.sleep)
 
-    def upload_image(self, path: Path, *, media_category: str = "tweet_image") -> MediaUploadResult:
+    def upload_image(self, path: Path, *, media_category: str = "post_image") -> MediaUploadResult:
         """
         Upload image file (up to 5MB).
 
-        GIFs are automatically routed to tweet_gif category with chunked upload enabled.
+        GIFs are automatically routed to post_gif category with chunked upload enabled.
 
         Args:
             path: Path to image file (jpeg, png, webp, gif)
-            media_category: Media category for Twitter API (default: tweet_image)
-                           Note: GIFs automatically use tweet_gif regardless of this parameter
+            media_category: Media category for X API (default: post_image)
+                           Note: GIFs automatically use post_gif regardless of this parameter
 
         Returns:
             MediaUploadResult with media_id
@@ -69,20 +69,29 @@ class MediaService:
         path = self._validate_path(path)
         mime_type = self._validate_image(path)
 
-        # GIFs require tweet_gif category and chunked upload
+        # GIFs require post_gif category and chunked upload
         if mime_type == "image/gif":
-            return self._upload(path, media_category="tweet_gif", mime_type=mime_type, chunked=True)
+            return self._upload(path, media_category="post_gif", mime_type=mime_type, chunked=True)
 
         # Other images don't need chunked upload (all under 5MB limit)
         return self._upload(path, media_category=media_category, mime_type=mime_type, chunked=False)
 
-    def upload_video(self, path: Path, *, media_category: str = "tweet_video") -> MediaUploadResult:
+    def upload_video(
+        self,
+        path: Path,
+        *,
+        media_category: str = "post_video",
+        poll_interval: float | None = None,
+        timeout: float | None = None,
+    ) -> MediaUploadResult:
         """
         Upload video file (up to 512MB with chunked upload).
 
         Args:
             path: Path to video file (mp4)
-            media_category: Media category for Twitter API (default: tweet_video)
+            media_category: Media category for X API (default: post_video)
+            poll_interval: Override default polling interval for processing status (seconds)
+            timeout: Override default timeout for processing completion (seconds)
 
         Returns:
             MediaUploadResult with media_id and processing_info
@@ -90,12 +99,24 @@ class MediaService:
         Raises:
             MediaValidationError: If file size exceeds limit or MIME type unsupported
             MediaProcessingTimeout: If processing takes too long
-            MediaProcessingFailed: If Twitter's processing fails
+            MediaProcessingFailed: If X's processing fails
         """
         path = self._validate_path(path)
         mime_type = self._validate_video(path)
+
+        # Use provided values or fall back to instance defaults
+        effective_poll_interval = poll_interval if poll_interval is not None else self.poll_interval
+        effective_timeout = timeout if timeout is not None else self.timeout
+
         # Videos require chunked upload for files >5MB (we enable it for all videos)
-        return self._upload(path, media_category=media_category, mime_type=mime_type, chunked=True)
+        return self._upload(
+            path,
+            media_category=media_category,
+            mime_type=mime_type,
+            chunked=True,
+            poll_interval=effective_poll_interval,
+            timeout=effective_timeout,
+        )
 
     def _upload(
         self,
@@ -104,15 +125,19 @@ class MediaService:
         media_category: str,
         mime_type: str | None,
         chunked: bool = False,
+        poll_interval: float | None = None,
+        timeout: float | None = None,
     ) -> MediaUploadResult:
         """
-        Upload media file to Twitter API.
+        Upload media file to X API.
 
         Args:
             path: Path to media file
-            media_category: tweet_image, tweet_gif, or tweet_video
+            media_category: post_image, post_gif, or post_video
             mime_type: MIME type of the file
             chunked: Enable chunked upload (required for videos >5MB)
+            poll_interval: Override default polling interval (seconds)
+            timeout: Override default timeout (seconds)
 
         Returns:
             MediaUploadResult with media_id and processing status
@@ -125,9 +150,15 @@ class MediaService:
                 chunked=chunked,
             )
         result = MediaUploadResult.from_api(response)
-        return self._await_processing(result)
+        return self._await_processing(result, poll_interval=poll_interval, timeout=timeout)
 
-    def _await_processing(self, result: MediaUploadResult) -> MediaUploadResult:
+    def _await_processing(
+        self,
+        result: MediaUploadResult,
+        *,
+        poll_interval: float | None = None,
+        timeout: float | None = None,
+    ) -> MediaUploadResult:
         info = result.processing_info
         if info is None:
             return result
@@ -145,10 +176,14 @@ class MediaService:
         if status_fetcher is None:
             raise MediaProcessingTimeout("Media processing is still in progress.")
 
-        deadline = time.monotonic() + self.timeout
+        # Use provided values or fall back to instance defaults
+        effective_poll_interval = poll_interval if poll_interval is not None else self.poll_interval
+        effective_timeout = timeout if timeout is not None else self.timeout
+
+        deadline = time.monotonic() + effective_timeout
         current = result
         while info and info.state.lower() in {"pending", "in_progress"}:
-            wait_seconds = info.check_after_secs or self.poll_interval
+            wait_seconds = info.check_after_secs or effective_poll_interval
             if time.monotonic() + wait_seconds > deadline:
                 raise MediaProcessingTimeout("Timed out waiting for media processing to complete.")
             self.sleep(wait_seconds)

@@ -7,7 +7,7 @@ TWEET_RESPONSE = {
     "data": {
         "id": "1234567890",
         "text": "Hello from integration test!",
-        "edit_history_tweet_ids": ["1234567890"],
+        "edit_history_post_ids": ["1234567890"],
     }
 }
 
@@ -20,7 +20,7 @@ DELETE_TWEET_RESPONSE = {
 GET_TWEET_RESPONSE = {
     "data": {
         "id": "1234567890",
-        "text": "Test tweet",
+        "text": "Test post",
         "author_id": "123456",
         "created_at": "2024-01-01T00:00:00.000Z",
     }

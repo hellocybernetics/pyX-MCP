@@ -1,7 +1,7 @@
-# Twitter API クライアント 設計・計画（2025-10-12 更新）
+# X (Twitter) API クライアント 設計・計画（2025-10-12 更新）
 
 ## 1. 目的と範囲
-- Python 製のクライアントライブラリとして、Twitter(X) API の投稿・取得・メディアアップロードを安全かつ拡張しやすく利用できるようにする。
+- Python 製のクライアントライブラリとして、X (Twitter) API の投稿・取得・メディアアップロードを安全かつ拡張しやすく利用できるようにする。
 - 旧 `oldsrc/` 配下の実装を置き換え、サービス層・MCP 連携・CLI から再利用できる単一コードベースを維持する。
 - プロトタイプ段階を脱し、本番運用を見据えた品質（テスト容易性、エラーハンドリング、監視性）を確保する。
 
@@ -9,13 +9,13 @@
 ```
 Client Apps / MCP / CLI
              ↓
- Service Layer (TweetService, MediaService, …)
+ Service Layer (PostService, MediaService, …)
              ↓
-    TweepyClient (v2 Tweet + v1.1 Media)
+    TweepyClient (v2 Post + v1.1 Media)
              ↓
-Twitter API v2 / v1.1
+X API v2 / v1.1
 ```
-- `twitter_client` パッケージを中心にサービス層と統合クライアントを提供し、外部インターフェース（ライブラリ API、CLI、MCP）から共通利用する。
+- `x_client` パッケージを中心にサービス層と統合クライアントを提供し、外部インターフェース（ライブラリ API、CLI、MCP）から共通利用する。
 - コンフィグ／認証、HTTP クライアント、ドメインモデル、例外を分離し、変更点を局所化する。
 
 ## 3. 品質目標
@@ -32,32 +32,32 @@ Twitter API v2 / v1.1
 - `OAuthManager` (`auth.py`): OAuth 1.0a フローをカプセル化。`callback_handler` を注入して CLI/MCP/GUI で再利用する設計。
 
 ### 4.2 クライアント層
-- `TweepyClient` (`clients/tweepy_client.py`): tweepy.Client (v2) と tweepy.API (v1.1) を統合し、ツイート操作とチャンク式メディアアップロードを一本化。
+- `TweepyClient` (`clients/tweepy_client.py`): tweepy.Client (v2) と tweepy.API (v1.1) を統合し、投稿操作とチャンク式メディアアップロードを一本化。
 - 将来の補助 `RestClient`（HTTPX など）導入を想定し、サービス層から差し替えられるインターフェースを定義済み。
 
 ### 4.3 サービス層
-- `TweetService`: 投稿/取得/削除/検索を提供し、レスポンスを `pydantic` モデルへマッピング。
+- `PostService`: 投稿/取得/削除/検索を提供し、レスポンスを `pydantic` モデルへマッピング。
 - `MediaService`: MIME/サイズ検証、チャンクアップロード、`processing_info` ポーリング、`MediaProcessingTimeout`/`MediaProcessingFailed` 例外を扱う。
 - `UserService` などフェーズ2以降の拡張を想定したモジュール構造を維持。
 
 ### 4.4 モデルと例外
 - すべての I/O モデルを `pydantic` v2 ベースで定義し、JSON Schema を自動生成可能にする。
-- 例外体系: `TwitterClientError`（基底）、`AuthenticationError`、`RateLimitExceeded`、`ApiResponseError`、`MediaProcessingTimeout` 等。
+- 例外体系: `XClientError`（基底）、`AuthenticationError`、`RateLimitExceeded`、`ApiResponseError`、`MediaProcessingTimeout` 等。
 
 ### 4.5 ロギングと可観測性
 - Python `logging` を利用し、呼び出し側から Logger を DI 可能。今後のメトリクス連携を見据え、レート制限情報や処理時間を構造化ログ化する計画。
 
 ## 5. MCP 統合設計
-- `twitter_client/integrations/mcp_adapter.py` がサービス層をラップし、MCP に準拠したツール群を公開。
-- 提供ツール: `post_tweet`, `delete_tweet`, `get_tweet`, `search_recent_tweets`, `upload_image`, `upload_video`, `get_auth_status`。
+- `x_client/integrations/mcp_adapter.py` がサービス層をラップし、MCP に準拠したツール群を公開。
+- 提供ツール: `create_post`, `delete_post`, `get_post`, `search_recent_posts`, `upload_image`, `upload_video`, `get_auth_status`。
 - `get_auth_status` は OAuth1 アクセストークンの `<user_id>-...` 形式からユーザー ID を抽出し、`RateLimitedClient` が保持するヘッダーを `{limit, remaining, reset_at}` に整形。ヘッダー未取得時は `rate_limit` を省略する。
-- MCP 向けスキーマは `twitter_client/integrations/schema.py` で管理し、JSON Schema 生成を通じてツール定義を同期。利用手順は README の MCP セクションを参照。
-- 既知課題: Tweepy のチャンクアップロードを HTTP モックする際、`responses` 互換性により統合テストをスキップ（`tests/integration/test_mcp_workflow.py::test_video_upload_workflow`）。CI 復帰に向けモック戦略の再設計が必要。
+- MCP 向けスキーマは `x_client/integrations/schema.py` で管理し、JSON Schema 生成を通じてツール定義を同期。利用手順は README の MCP セクションを参照。
+- 既知課題: Tweepy のチャンクアップロードを HTTP モックする際、`responses` 互換性により統合テストをスキップ（`tests/integration/test_mcp_workflow.py::test_video_upload_and_post_workflow`）。CI 復帰に向けモック戦略の再設計が必要。
 
 ## 6. 現在の実装状況（2025-10-12）
 - ✅ デュアルクライアント構成確立（tweepy.Client v2 + tweepy.API v1.1）。
 - ✅ ConfigManager / OAuthManager による資格情報管理と CLI サンプル。
-- ✅ `TweetService`/`MediaService` と主要ユニットテスト完了。
+- ✅ `PostService`/`MediaService` と主要ユニットテスト完了。
 - ✅ MCP アダプタ実装・スキーマ・ユニット/統合テスト整備。
 - ✅ README に MCP 利用方法を統合。
 - 🔄 レート制限ハンドラと自動バックオフは未実装。`rate_limit.py` ドラフトを次スプリントで扱う予定。
@@ -71,7 +71,7 @@ Twitter API v2 / v1.1
 - OAuth1 アクセストークンのフォーマットが `<user_id>-<token>` でない場合、`get_auth_status` の `user_id` 取得に失敗する。プロダクション用資格情報で要確認。
 - レート制限情報はレートリミットが発生したリクエスト後にのみ取得できるため、初回の `get_auth_status` では `rate_limit` が空になる場合がある。仕様として許容しつつ、今後の UX 改善を検討。
 - Tweepy + `responses` の互換性不足により、チャンク動画アップロード統合テストをスキップ中。モック戦略の刷新または別ライブラリ採用を検討。
-- 実環境での API 呼び出し結果は手動検証に頼っており、CI での自動カバレッジが不十分。
+- 実環境での X API 呼び出し結果は手動検証に頼っており、CI での自動カバレッジが不十分。
 
 ## 8. 今後の計画
 ### 8.1 次スプリント（2025-10-19〜2025-10-31）
@@ -83,13 +83,13 @@ Twitter API v2 / v1.1
 ### 8.2 バックログ
 - 50MB 超動画のストリーミング最適化と CI モック再構築。
 - `UserService` / `StreamService` などフェーズ2機能の設計。
-- MCP ツールの拡張（ツイート削除以外のユーザー操作など）。
+- MCP ツールの拡張（投稿削除以外のユーザー操作など）。
 - CI/CD パイプライン整備（lint、カバレッジ、メトリクス、Secrets スキャン）。
 - マルチユーザー認証管理、Secrets 管理基盤との統合。
 
 ## 9. 手動検証ポリシー（暫定）
-1. `.env` に有効な Twitter API 資格情報を設定し、`ConfigManager` から読み込む。
-2. `python examples/post_tweet.py --video <path>` などで動画アップロード→ツイート投稿を確認し、`processing_info` を記録。
+1. `.env` に有効な X API 資格情報を設定し、`ConfigManager` から読み込む。
+2. `python examples/create_post.py --video <path>` などで動画アップロード→投稿を確認し、`processing_info` を記録。
 3. タイムアウト／失敗分岐は大容量ファイルや不正動画を用意して検証し、`MediaProcessingTimeout` / `MediaProcessingFailed` 発生をログ化。
 4. 手動テスト結果は `docs/manual_test_reports/`（将来作成）に日付付きで記録し、モック戦略改善後は CI へ還元する。
 
@@ -100,7 +100,25 @@ Twitter API v2 / v1.1
 - ロギングは標準 `logging` を活用し、呼び出し側でハンドラ差し替え可能な設計とした。メトリクス導入はバックログに位置付け。
 - tweepy 採用理由: コミュニティ規模と更新頻度が高く、v2/v1.1 API の双方を一貫したインターフェースで扱える点、既存ツールの社内資産との互換性を優先した。動画アップロードのチャンク処理や OAuth1 サポートが成熟しており、Phase 1 を迅速に立ち上げる目的に合致していた。
 - RestClient 準備の背景: Ads/Premium/GraphQL など tweepy がカバーしないエンドポイントや、HTTP レベルでの細かなタイムアウト制御・リトライ実装が必要になるリスクを見込み、HTTPX ベースのフォールバックを計画。`clients/rest_client.py` のスケルトンとインターフェースは初期段階から確保済み。
-- 差し替え容易性の確保: サービス層は `TweetClient` / `MediaClient` プロトコルに依存し、具象実装は DI で注入する構造を採用。メディア処理やツイート操作はインターフェース経由で呼び出すため、tweepy 実装を RestClient 実装へ置き換える際はファクトリで注入するクライアントを切り替えるだけで済む。テストもプロトコル準拠のフェイクで構築しており、将来の全面移行時にサービス層の改修を最小化できる。
+- 差し替え容易性の確保: サービス層は `PostClient` / `MediaClient` プロトコルに依存し、具象実装は DI で注入する構造を採用。メディア処理や投稿操作はインターフェース経由で呼び出すため、tweepy 実装を RestClient 実装へ置き換える際はファクトリで注入するクライアントを切り替えるだけで済む。テストもプロトコル準拠のフェイクで構築しており、将来の全面移行時にサービス層の改修を最小化できる。
+
+## 11. 一時フォーカスエリア（2025-10-12 時点）
+この項目は、現在フォーカスしている設計や実装についての計画をブレイクダウンする場所。
+実装が進行するにつれて新しい内容に書き換えていくこと。古い内容や終わった内容は書き残す必要がない。
+
+- **長文スレッド投稿サポート**
+  - テキスト分割ユーティリティ実装（文字数制限と単語境界を考慮）。
+  - `PostService.create_thread` を追加し、生成された投稿 ID を連鎖的に `in_reply_to` へ渡す。
+  - エラー時のロールバック方針とレスポンス仕様（投稿一覧・失敗詳細）を決定。
+  - ユニットテスト（分割ケース、失敗シナリオ）および README/MCP ドキュメント更新。
+- **リポスト機能**
+  - `TweepyClient` へ `repost_post` / `undo_repost` を追加し tweepy の `Client.retweet` 等をラップ。
+  - `PostService` に対応メソッドを追加し、MCP スキーマ/ツールにも反映。
+  - 成功・失敗ケースのユニット/統合テストを整備し、利用例を README に追記。
+- **検索レスポンス拡張**
+  - `PostService.search_recent` に expansions / フィールド指定を許可する引数を整理。
+  - `Post` モデルと MCP レスポンスを必要に応じて拡張（著者情報など）。
+  - ドキュメントに高度な検索例と既知制約を記載。
 
 ---
 この文書はプロジェクトの単一ソースとして設計と計画を管理する。最新の利用手順や API 例は `README.md` を参照し、更新が必要な場合は本書と README を同期させること。

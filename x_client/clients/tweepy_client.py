@@ -12,7 +12,7 @@ from typing import Any, BinaryIO
 
 import tweepy
 
-from twitter_client.exceptions import ApiResponseError, RateLimitExceeded
+from x_client.exceptions import ApiResponseError, RateLimitExceeded
 
 try:  # pragma: no cover - defensive import
     TweepyErrors = tweepy.errors  # type: ignore[attr-defined]
@@ -46,16 +46,16 @@ class TweepyClient:
         self._client = v2_client
         self._api = v1_api
 
-    def create_tweet(self, **kwargs: Any) -> Any:
+    def create_post(self, **kwargs: Any) -> Any:
         return self._invoke("create_tweet", **kwargs)
 
-    def delete_tweet(self, tweet_id: str) -> Any:
-        return self._invoke("delete_tweet", tweet_id)
+    def delete_post(self, post_id: str) -> Any:
+        return self._invoke("delete_tweet", post_id)
 
-    def get_tweet(self, tweet_id: str, **kwargs: Any) -> Any:
-        return self._invoke("get_tweet", tweet_id, **kwargs)
+    def get_post(self, post_id: str, **kwargs: Any) -> Any:
+        return self._invoke("get_tweet", post_id, **kwargs)
 
-    def search_recent_tweets(self, query: str, **kwargs: Any) -> Any:
+    def search_recent_posts(self, query: str, **kwargs: Any) -> Any:
         return self._invoke("search_recent_tweets", query, **kwargs)
 
     def upload_media(
@@ -75,7 +75,7 @@ class TweepyClient:
 
         Args:
             file: Binary file object to upload
-            media_category: tweet_image, tweet_gif, or tweet_video
+            media_category: post_image, post_gif, or post_video
             mime_type: MIME type (e.g., image/png, video/mp4)
             chunked: Enable chunked upload for large files (required for videos >5MB)
             **kwargs: Additional parameters passed to Twitter API

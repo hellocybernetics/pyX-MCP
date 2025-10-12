@@ -1,5 +1,5 @@
 """
-Configuration management utilities for twitter_client.
+Configuration management utilities for x_client.
 """
 
 from __future__ import annotations
@@ -9,29 +9,29 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
 
-from twitter_client.exceptions import ConfigurationError
+from x_client.exceptions import ConfigurationError
 
 ENV_VAR_MAP = {
-    "api_key": "TWITTER_API_KEY",
-    "api_secret": "TWITTER_API_SECRET",
-    "access_token": "TWITTER_ACCESS_TOKEN",
-    "access_token_secret": "TWITTER_ACCESS_TOKEN_SECRET",
-    "bearer_token": "TWITTER_BEARER_TOKEN",
+    "api_key": "X_API_KEY",
+    "api_secret": "X_API_SECRET",
+    "access_token": "X_ACCESS_TOKEN",
+    "access_token_secret": "X_ACCESS_TOKEN_SECRET",
+    "bearer_token": "X_BEARER_TOKEN",
 }
 
 
 class CredentialsProvider(Protocol):
     """Abstract provider used to decouple persistence from runtime usage."""
 
-    def load(self) -> "TwitterCredentials":
+    def load(self) -> "XCredentials":
         raise NotImplementedError
 
-    def save(self, credentials: "TwitterCredentials") -> None:
+    def save(self, credentials: "XCredentials") -> None:
         raise NotImplementedError
 
 
 @dataclass(slots=True)
-class TwitterCredentials:
+class XCredentials:
     """Credential container supporting OAuth 1.0a and OAuth 2.0 tokens."""
 
     api_key: str | None = None
@@ -52,10 +52,10 @@ class TwitterCredentials:
             )
         )
 
-    def merge(self, other: "TwitterCredentials") -> "TwitterCredentials":
+    def merge(self, other: "XCredentials") -> "XCredentials":
         """Merge credential sets, preferring non-null values from ``other``."""
 
-        return TwitterCredentials(
+        return XCredentials(
             api_key=other.api_key or self.api_key,
             api_secret=other.api_secret or self.api_secret,
             access_token=other.access_token or self.access_token,
@@ -71,7 +71,7 @@ class TwitterCredentials:
         }
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, str | None]) -> "TwitterCredentials":
+    def from_mapping(cls, data: Mapping[str, str | None]) -> "XCredentials":
         return cls(
             api_key=data.get("api_key"),
             api_secret=data.get("api_secret"),
@@ -96,7 +96,7 @@ class ConfigManager:
     def load_credentials(
         self,
         priority: Sequence[str] = ("env", "dotenv"),
-    ) -> TwitterCredentials:
+    ) -> XCredentials:
         """
         Load credentials according to the requested priority order.
 
@@ -115,23 +115,23 @@ class ConfigManager:
             if credentials and not credentials.is_empty():
                 return credentials
 
-        raise ConfigurationError("Twitter credentials are not configured.")
+        raise ConfigurationError("X (Twitter) credentials are not configured.")
 
-    def save_credentials(self, credentials: TwitterCredentials) -> None:
+    def save_credentials(self, credentials: XCredentials) -> None:
         """Persist credentials to .env, merging with existing values."""
 
         existing = self._load_from_dotenv()
         merged = existing.merge(credentials) if existing else credentials
         self._write_to_dotenv(merged)
 
-    def _load_from_env(self) -> TwitterCredentials | None:
+    def _load_from_env(self) -> XCredentials | None:
         values: dict[str, str | None] = {
             field: self._env.get(env_name) for field, env_name in ENV_VAR_MAP.items()
         }
-        credentials = TwitterCredentials.from_mapping(values)
+        credentials = XCredentials.from_mapping(values)
         return credentials if not credentials.is_empty() else None
 
-    def _load_from_dotenv(self) -> TwitterCredentials | None:
+    def _load_from_dotenv(self) -> XCredentials | None:
         path = self._dotenv_path
         if not path.exists() or not path.is_file():
             return None
@@ -155,10 +155,10 @@ class ConfigManager:
                     values[field] = value or None
                     break
 
-        credentials = TwitterCredentials.from_mapping(values)
+        credentials = XCredentials.from_mapping(values)
         return credentials if not credentials.is_empty() else None
 
-    def _write_to_dotenv(self, credentials: TwitterCredentials) -> None:
+    def _write_to_dotenv(self, credentials: XCredentials) -> None:
         path = self._dotenv_path
         existing_lines: list[str] = []
         if path.exists():
@@ -195,7 +195,7 @@ class ConfigManager:
                 updated_lines.append(f"{key}={value}")
 
         if not updated_lines:
-            updated_lines.append("# Twitter API credentials")
+            updated_lines.append("# X (Twitter) API credentials")
             for key, value in env_values.items():
                 updated_lines.append(f"{key}={value}")
 

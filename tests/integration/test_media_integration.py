@@ -6,17 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from twitter_client.clients.tweepy_client import TweepyClient
-from twitter_client.config import TwitterCredentials
-from twitter_client.exceptions import MediaValidationError
-from twitter_client.factory import TwitterClientFactory
-from twitter_client.services.media_service import MediaService
+from x_client.clients.tweepy_client import TweepyClient
+from x_client.config import XCredentials
+from x_client.exceptions import MediaValidationError
+from x_client.factory import XClientFactory
+from x_client.services.media_service import MediaService
 
 
 @pytest.fixture
-def credentials() -> TwitterCredentials:
+def credentials() -> XCredentials:
     """Provide valid test credentials."""
-    return TwitterCredentials(
+    return XCredentials(
         api_key="test_api_key",
         api_secret="test_api_secret",
         access_token="test_access_token",
@@ -25,9 +25,9 @@ def credentials() -> TwitterCredentials:
 
 
 @pytest.fixture
-def client(credentials: TwitterCredentials) -> TweepyClient:
+def client(credentials: XCredentials) -> TweepyClient:
     """Create TweepyClient with test credentials."""
-    return TwitterClientFactory.create_from_credentials(credentials)
+    return XClientFactory.create_from_credentials(credentials)
 
 
 @pytest.fixture
@@ -41,9 +41,9 @@ def _write_file(path: Path, size: int) -> None:
     path.write_bytes(b"\0" * size)
 
 
-def test_media_service_initialization(credentials: TwitterCredentials) -> None:
+def test_media_service_initialization(credentials: XCredentials) -> None:
     """Integration: MediaService properly initializes with factory client."""
-    client = TwitterClientFactory.create_from_credentials(credentials)
+    client = XClientFactory.create_from_credentials(credentials)
     media_service = MediaService(client)
 
     assert media_service.client is client
