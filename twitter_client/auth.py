@@ -70,7 +70,7 @@ class OAuthManager:
         if callback is None:
             raise ConfigurationError("A callback handler is required to start OAuth.")
 
-        credentials = self._config_manager.load_credentials(priority=("env", "file"))
+        credentials = self._config_manager.load_credentials(priority=("env", "dotenv"))
         consumer_key = credentials.api_key
         consumer_secret = credentials.api_secret
         if not consumer_key or not consumer_secret:
@@ -125,4 +125,3 @@ class OAuthManager:
             access_token_secret=tokens.access_token_secret,
         )
         self._config_manager.save_credentials(combined)
-

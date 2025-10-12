@@ -51,7 +51,7 @@ tests/
 
 ## 4. 核となるクラス設計
 ### 4.1 ConfigManager (`config.py`)
-- 役割: `credentials/twitter_config.json` と `.env`/環境変数から設定読込。書込も管理。
+- 役割: `.env` / 環境変数から設定を読み込み、OAuth フローで取得した資格情報を `.env` に保存。
 - インタフェース: `load_credentials()`, `save_credentials()`
 - 将来: OS の秘密管理（Keyring 等）にも対応可能な抽象クラス化を検討。
 
@@ -132,7 +132,7 @@ tests/
 
 ## 10. 設計レビュー結果（初回）
 - **パッケージ命名**: `twitter_client` で統一。将来公式 SDK と衝突しないか確認するため、PyPI 公開時には `xclient-twitter` など代替名を検討。
-- **Config 管理**: JSON 保存に加え、環境変数→`.env`→JSON の順で参照する三段構成に更新。`ConfigManager` は `load_credentials(priority=('env', 'dotenv', 'file'))` を公開。
+- **Config 管理**: 環境変数→`.env` の順で参照し、`.env` への保存も行う二段構成へ整理。`ConfigManager` は `load_credentials(priority=('env', 'dotenv'))` を公開。
 - **認証フロー**: OAuth 1.0a は従来通りブラウザリダイレクト、MCP 連携時は `callback_handler` としてコマンドライン／対話 UI／MCP セッション情報を差し替え可能にする。
 - **クライアント実装**: tweepy を一次選択とし、`clients/tweepy_client.py` で v2 のツイート操作 (`tweepy.Client`) と v1.1 のメディアアップロード (`tweepy.API.media_upload`) をデュアルクライアント構成で統合管理。細かな制御が必要になった場合に備えて `rest_client.py` を後日追加できるようインタフェースを整備。
 - **サービス分割**: `TweetService` と `MediaService` を最優先で実装。`UserService` と検索機能はフェーズ2で追加する。共通 `BaseService` を用意し、エンドポイントパスとレスポンス変換を一元化。
@@ -161,7 +161,7 @@ tests/
 ### 12.1 手動検証ポリシー（暫定対応）
 - v1.1 チャンクアップロードの統合テストは Tweepy 側の内部仕様変更により `responses` モックが破綻しているため、2025-10-11 時点では CI 実行を停止し、実アカウントを用いた手動テストに切り替える。
 - 手動テスト手順:
-  1. `.env` もしくは `credentials/twitter_config.json` に有効な `TWITTER_API_*` / OAuth1 トークンを投入し、`ConfigManager` 経由で読み込ませる。
+  1. `.env` に有効な `TWITTER_API_*` / OAuth1 トークンを投入し、`ConfigManager` 経由で読み込ませる。
   2. `python examples/post_tweet.py --video <path>` などの実行で動画アップロード→ツイート投稿を確認し、レスポンス内 `processing_info` の状態を記録。
   3. タイムアウト／失敗分岐を確認する場合は意図的に大容量ファイルや壊れた動画を使用し、`MediaProcessingTimeout` / `MediaProcessingFailed` が発生することをログ化。
 - 手動検証結果は `docs/manual_test_reports/`（予定）に日付付きで記録し、CI 復帰の方針が固まり次第、テストコードへ反映する。

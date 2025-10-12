@@ -4,7 +4,6 @@ Configuration management utilities for twitter_client.
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -83,22 +82,20 @@ class TwitterCredentials:
 
 
 class ConfigManager:
-    """Loads and persists credentials from environment variables or disk."""
+    """Load and persist credentials from environment variables or a .env file."""
 
     def __init__(
         self,
-        credential_path: Path | None = None,
         *,
         env: Mapping[str, str] | None = None,
-        dotenv_path: Path | None = None,
+        dotenv_path: Path | str | None = None,
     ) -> None:
-        self._credential_path = credential_path or Path("credentials/twitter_config.json")
         self._env = env or os.environ
-        self._dotenv_path = dotenv_path or Path(".env")
+        self._dotenv_path = Path(dotenv_path) if dotenv_path else Path(".env")
 
     def load_credentials(
         self,
-        priority: Sequence[str] = ("env", "dotenv", "file"),
+        priority: Sequence[str] = ("env", "dotenv"),
     ) -> TwitterCredentials:
         """
         Load credentials according to the requested priority order.
@@ -112,8 +109,6 @@ class ConfigManager:
                 credentials = self._load_from_env()
             elif source == "dotenv":
                 credentials = self._load_from_dotenv()
-            elif source == "file":
-                credentials = self._load_from_file()
             else:
                 raise ValueError(f"Unknown credential source '{source}'.")
 
@@ -123,38 +118,17 @@ class ConfigManager:
         raise ConfigurationError("Twitter credentials are not configured.")
 
     def save_credentials(self, credentials: TwitterCredentials) -> None:
-        """Persist credentials to disk, merging with existing values."""
+        """Persist credentials to .env, merging with existing values."""
 
-        existing = self._load_from_file()
+        existing = self._load_from_dotenv()
         merged = existing.merge(credentials) if existing else credentials
-
-        self._credential_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._credential_path.open("w", encoding="utf-8") as fp:
-            json.dump(merged.to_dict(), fp, indent=2, sort_keys=True)
-
-        # Set file permissions to owner read/write only for security
-        os.chmod(self._credential_path, 0o600)
+        self._write_to_dotenv(merged)
 
     def _load_from_env(self) -> TwitterCredentials | None:
         values: dict[str, str | None] = {
             field: self._env.get(env_name) for field, env_name in ENV_VAR_MAP.items()
         }
         credentials = TwitterCredentials.from_mapping(values)
-        return credentials if not credentials.is_empty() else None
-
-    def _load_from_file(self) -> TwitterCredentials | None:
-        if not self._credential_path.exists():
-            return None
-
-        with self._credential_path.open("r", encoding="utf-8") as fp:
-            data = json.load(fp)
-
-        if not isinstance(data, Mapping):
-            raise ConfigurationError(
-                f"Credential file {self._credential_path} did not contain a mapping."
-            )
-
-        credentials = TwitterCredentials.from_mapping(data)
         return credentials if not credentials.is_empty() else None
 
     def _load_from_dotenv(self) -> TwitterCredentials | None:
@@ -183,3 +157,48 @@ class ConfigManager:
 
         credentials = TwitterCredentials.from_mapping(values)
         return credentials if not credentials.is_empty() else None
+
+    def _write_to_dotenv(self, credentials: TwitterCredentials) -> None:
+        path = self._dotenv_path
+        existing_lines: list[str] = []
+        if path.exists():
+            existing_lines = path.read_text(encoding="utf-8").splitlines()
+
+        env_values = {
+            env_name: getattr(credentials, field)
+            for field, env_name in ENV_VAR_MAP.items()
+            if getattr(credentials, field)
+        }
+
+        # Track which variables we have updated to avoid duplicates
+        seen_keys: set[str] = set()
+        updated_lines: list[str] = []
+
+        for line in existing_lines:
+            stripped = line.strip()
+
+            if not stripped or stripped.startswith("#") or "=" not in line:
+                updated_lines.append(line)
+                continue
+
+            key, _ = line.split("=", 1)
+            key = key.strip()
+            if key in env_values:
+                updated_lines.append(f"{key}={env_values[key]}")
+                seen_keys.add(key)
+            else:
+                updated_lines.append(line)
+
+        # Append any new keys that were not present previously
+        for key, value in env_values.items():
+            if key not in seen_keys:
+                updated_lines.append(f"{key}={value}")
+
+        if not updated_lines:
+            updated_lines.append("# Twitter API credentials")
+            for key, value in env_values.items():
+                updated_lines.append(f"{key}={value}")
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
+        os.chmod(path, 0o600)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections import deque
 from pathlib import Path
 import re
@@ -328,16 +327,19 @@ def test_end_to_end_tweet_with_image(
 @responses.activate
 def test_factory_initialization_with_config(tmp_path: Path) -> None:
     """Integration: Factory creates client from ConfigManager with HTTP mocking."""
-    # Create config file
-    config_file = tmp_path / "twitter_config.json"
-    config_data = {
-        "api_key": "test_key",
-        "api_secret": "test_secret",
-        "access_token": "test_token",
-        "access_token_secret": "test_token_secret",
-        "bearer_token": "test_bearer",
-    }
-    config_file.write_text(json.dumps(config_data))
+    # Create dotenv file
+    config_file = tmp_path / ".env"
+    config_file.write_text(
+        "\n".join(
+            [
+                "TWITTER_API_KEY=test_key",
+                "TWITTER_API_SECRET=test_secret",
+                "TWITTER_ACCESS_TOKEN=test_token",
+                "TWITTER_ACCESS_TOKEN_SECRET=test_token_secret",
+                "TWITTER_BEARER_TOKEN=test_bearer",
+            ]
+        )
+    )
 
     # Mock API call
     responses.add(
@@ -348,7 +350,7 @@ def test_factory_initialization_with_config(tmp_path: Path) -> None:
     )
 
     # Load config and create client
-    config = ConfigManager(credential_path=config_file)
+    config = ConfigManager(dotenv_path=config_file)
     client = TwitterClientFactory.create_from_config(config)
     tweet_service = TweetService(client)
 

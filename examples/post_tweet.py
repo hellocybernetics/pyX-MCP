@@ -3,7 +3,7 @@
 Example: Post a tweet with optional media using twitter_client.
 
 This example demonstrates:
-- Loading credentials from environment or file
+- Loading credentials from environment or .env file
 - Creating a client using the factory
 - Uploading media (image or video)
 - Creating a tweet with or without media
@@ -19,7 +19,7 @@ Usage:
     python examples/post_tweet.py "Check out this video!" --video path/to/video.mp4
 
 Requirements:
-    Set environment variables or create credentials/twitter_config.json:
+    Set environment variables or create a .env file with:
     - TWITTER_API_KEY
     - TWITTER_API_SECRET
     - TWITTER_ACCESS_TOKEN
@@ -62,9 +62,9 @@ def main() -> int:
         help="Path to video file (mp4, max 512MB with chunked upload)",
     )
     parser.add_argument(
-        "--config",
+        "--dotenv",
         type=Path,
-        help="Path to credentials JSON file (default: credentials/twitter_config.json)",
+        help="Path to .env file (default: ./.env)",
     )
 
     args = parser.parse_args()
@@ -77,8 +77,7 @@ def main() -> int:
     try:
         # Step 1: Load credentials
         print("Loading credentials...")
-        config_path = args.config if args.config else None
-        config = ConfigManager(credential_path=config_path)
+        config = ConfigManager(dotenv_path=args.dotenv) if args.dotenv else ConfigManager()
         credentials = config.load_credentials()
         print("✅ Credentials loaded")
 
@@ -126,7 +125,7 @@ def main() -> int:
 
     except ConfigurationError as e:
         print(f"❌ Configuration error: {e}")
-        print("\nPlease set environment variables or create credentials file:")
+        print("\nPlease set environment variables or create a .env file:")
         print("  - TWITTER_API_KEY")
         print("  - TWITTER_API_SECRET")
         print("  - TWITTER_ACCESS_TOKEN")

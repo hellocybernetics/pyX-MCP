@@ -32,7 +32,7 @@ def test_ensure_oauth1_token_returns_cached_tokens(tmp_path) -> None:
         "TWITTER_ACCESS_TOKEN": "cached-access",
         "TWITTER_ACCESS_TOKEN_SECRET": "cached-secret",
     }
-    manager = ConfigManager(credential_path=tmp_path / "twitter.json", env=env)
+    manager = ConfigManager(env=env, dotenv_path=tmp_path / ".env")
     oauth = OAuthManager(manager)
 
     tokens = oauth.ensure_oauth1_token()
@@ -44,8 +44,8 @@ def test_start_oauth1_flow_persists_tokens(tmp_path) -> None:
         "TWITTER_API_KEY": "api-key",
         "TWITTER_API_SECRET": "api-secret",
     }
-    path = tmp_path / "twitter.json"
-    manager = ConfigManager(credential_path=path, env=env)
+    dotenv_path = tmp_path / ".env"
+    manager = ConfigManager(env=env, dotenv_path=dotenv_path)
 
     def factory(*args, **kwargs):
         return DummyOAuthHandler(*args, **kwargs)
@@ -58,7 +58,7 @@ def test_start_oauth1_flow_persists_tokens(tmp_path) -> None:
     tokens = oauth.ensure_oauth1_token()
 
     assert tokens.access_token == "new-access-token"
-    data = path.read_text(encoding="utf-8")
+    data = dotenv_path.read_text(encoding="utf-8")
     assert "new-access-secret" in data
 
 
@@ -67,7 +67,7 @@ def test_start_oauth1_flow_raises_on_auth_failure(tmp_path) -> None:
         "TWITTER_API_KEY": "api-key",
         "TWITTER_API_SECRET": "api-secret",
     }
-    manager = ConfigManager(credential_path=tmp_path / "twitter.json", env=env)
+    manager = ConfigManager(env=env, dotenv_path=tmp_path / ".env")
 
     class FailingHandler(DummyOAuthHandler):
         def get_authorization_url(self) -> str:
@@ -84,11 +84,11 @@ def test_start_oauth1_flow_raises_on_auth_failure(tmp_path) -> None:
 
 def test_refresh_token_requires_callback(tmp_path) -> None:
     manager = ConfigManager(
-        credential_path=tmp_path / "twitter.json",
         env={
             "TWITTER_API_KEY": "api-key",
             "TWITTER_API_SECRET": "api-secret",
         },
+        dotenv_path=tmp_path / ".env",
     )
     oauth = OAuthManager(manager)
 

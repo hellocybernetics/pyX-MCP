@@ -29,7 +29,7 @@
 ## セットアップ
 1. **Python 3.13+** を想定。パッケージ管理には `uv` を利用。
 2. 依存関係インストール: `uv sync`
-3. 認証情報は `.env` / 環境変数 / `credentials/twitter_config.json` で管理。ファイル保存時に自動的に0o600（所有者のみ読み書き可能）に設定されます。
+3. 認証情報は `.env` または環境変数で管理します。`.env` ファイルは自動的に0o600（所有者のみ読み書き可能）に設定されます。
 4. **新機能**: `TwitterClientFactory` を使用してクライアントを簡単に初期化できます。
 
 ### 認証情報の設定
@@ -52,18 +52,7 @@ TWITTER_ACCESS_TOKEN_SECRET=your_access_token_secret
 TWITTER_BEARER_TOKEN=your_bearer_token
 ```
 
-`.env` はリポジトリ直下に置くと `ConfigManager` が自動的に読み込みます。別パスを使う場合は `ConfigManager(dotenv_path=Path("/path/to/.env"))` のように明示してください。 `.env*` は `.gitignore` 済みのため、バージョン管理に含めないでください。
-
-または `credentials/twitter_config.json` に保存:
-```json
-{
-  "access_token": "your_access_token",
-  "access_token_secret": "your_access_token_secret",
-  "api_key": "your_api_key",
-  "api_secret": "your_api_secret",
-  "bearer_token": "your_bearer_token"
-}
-```
+`.env` はリポジトリ直下に置くと `ConfigManager` が自動的に読み込みます。別パスを使う場合は `ConfigManager(dotenv_path=Path("/path/to/.env"))` のように明示してください。 `.env*` は `.gitignore` 済みのため、バージョン管理に含めないでください。OAuth フロー経由で取得したトークンは `ConfigManager.save_credentials()` により `.env` に追記されます。
 
 ## 使用例
 
@@ -109,6 +98,9 @@ python examples/post_tweet.py "Check out this image!" --image path/to/image.png
 
 # 動画付き（最大512MB、チャンクアップロード対応）
 python examples/post_tweet.py "Check out this video!" --video path/to/video.mp4
+
+# 別パスの .env を利用
+python examples/post_tweet.py "Hello with custom env" --dotenv /secure/path/.env
 ```
 
 ## 次のアクション例
