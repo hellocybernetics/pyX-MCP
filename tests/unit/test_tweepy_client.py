@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+import io
 
 import pytest
 import tweepy
@@ -145,3 +146,35 @@ def test_search_recent_tweets_delegates() -> None:
     assert isinstance(response.data, list)
     assert v2_client.called_with["search_recent_tweets"][0][0] == "query"
     assert v2_client.called_with["search_recent_tweets"][1]["max_results"] == 5
+
+
+def test_upload_media_passes_media_type_for_non_chunked() -> None:
+    v2_client = StubV2Client()
+    v1_api = StubV1API()
+    client = TweepyClient(v2_client, v1_api)  # type: ignore[arg-type]
+
+    file_obj = io.BytesIO(b"pngdata")
+    file_obj.name = "image.png"  # type: ignore[attr-defined]
+
+    client.upload_media(file=file_obj, media_category="tweet_image", mime_type="image/png", chunked=False)
+
+    kwargs = v1_api.called_with["media_upload"][1]
+    assert kwargs["media_category"] == "tweet_image"
+    assert kwargs["chunked"] is False
+    assert kwargs["media_type"] == "image/png"
+
+
+def test_upload_media_strips_media_type_when_chunked() -> None:
+    v2_client = StubV2Client()
+    v1_api = StubV1API()
+    client = TweepyClient(v2_client, v1_api)  # type: ignore[arg-type]
+
+    file_obj = io.BytesIO(b"videodata")
+    file_obj.name = "video.mp4"  # type: ignore[attr-defined]
+
+    client.upload_media(file=file_obj, media_category="tweet_video", mime_type="video/mp4", chunked=True)
+
+    kwargs = v1_api.called_with["media_upload"][1]
+    assert kwargs["media_category"] == "tweet_video"
+    assert kwargs["chunked"] is True
+    assert "media_type" not in kwargs

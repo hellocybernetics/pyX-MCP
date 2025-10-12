@@ -58,6 +58,25 @@ def test_load_credentials_from_file_when_env_empty(tmp_path: Path) -> None:
     assert credentials.access_token_secret == "file-access-secret"
 
 
+def test_load_credentials_from_dotenv(tmp_path: Path) -> None:
+    dotenv_file = tmp_path / ".env"
+    dotenv_file.write_text(
+        """
+TWITTER_API_KEY=dotenv-key
+TWITTER_API_SECRET=dotenv-secret
+TWITTER_ACCESS_TOKEN=dotenv-access
+TWITTER_ACCESS_TOKEN_SECRET=dotenv-access-secret
+TWITTER_BEARER_TOKEN=dotenv-bearer
+""".strip()
+    )
+
+    manager = ConfigManager(credential_path=tmp_path / "credentials.json", env={}, dotenv_path=dotenv_file)
+    credentials = manager.load_credentials(priority=("dotenv",))
+
+    assert credentials.api_key == "dotenv-key"
+    assert credentials.access_token_secret == "dotenv-access-secret"
+
+
 def test_load_credentials_raises_when_missing(tmp_path: Path) -> None:
     manager = ConfigManager(credential_path=tmp_path / "twitter.json", env={})
 
@@ -90,4 +109,3 @@ def test_save_credentials_merges_existing_values(tmp_path: Path) -> None:
     assert data["api_key"] == "existing-key"
     assert data["access_token"] == "new-access"
     assert data["access_token_secret"] == "new-secret"
-

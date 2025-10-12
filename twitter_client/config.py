@@ -90,13 +90,15 @@ class ConfigManager:
         credential_path: Path | None = None,
         *,
         env: Mapping[str, str] | None = None,
+        dotenv_path: Path | None = None,
     ) -> None:
         self._credential_path = credential_path or Path("credentials/twitter_config.json")
         self._env = env or os.environ
+        self._dotenv_path = dotenv_path or Path(".env")
 
     def load_credentials(
         self,
-        priority: Sequence[str] = ("env", "file"),
+        priority: Sequence[str] = ("env", "dotenv", "file"),
     ) -> TwitterCredentials:
         """
         Load credentials according to the requested priority order.
@@ -108,6 +110,8 @@ class ConfigManager:
         for source in priority:
             if source == "env":
                 credentials = self._load_from_env()
+            elif source == "dotenv":
+                credentials = self._load_from_dotenv()
             elif source == "file":
                 credentials = self._load_from_file()
             else:
@@ -153,3 +157,29 @@ class ConfigManager:
         credentials = TwitterCredentials.from_mapping(data)
         return credentials if not credentials.is_empty() else None
 
+    def _load_from_dotenv(self) -> TwitterCredentials | None:
+        path = self._dotenv_path
+        if not path.exists() or not path.is_file():
+            return None
+
+        values: dict[str, str | None] = {key: None for key in ENV_VAR_MAP}
+
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+
+            if "=" not in stripped:
+                continue
+
+            key, raw_value = stripped.split("=", 1)
+            key = key.strip()
+            value = raw_value.strip().strip('"').strip("'")
+
+            for field, env_name in ENV_VAR_MAP.items():
+                if key == env_name:
+                    values[field] = value or None
+                    break
+
+        credentials = TwitterCredentials.from_mapping(values)
+        return credentials if not credentials.is_empty() else None

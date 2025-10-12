@@ -90,10 +90,17 @@ class TweepyClient:
                 upload_kwargs["media_type"] = mime_type
             upload_kwargs.update(kwargs)
 
+            # Tweepy passes media_type positionally for chunked uploads; providing the
+            # keyword duplicates the argument and raises TypeError. Strip it before the
+            # call while keeping media_type available for non-chunked uploads.
+            api_kwargs = dict(upload_kwargs)
+            if chunked:
+                api_kwargs.pop("media_type", None)
+
             return self._api.media_upload(
                 filename=file.name if hasattr(file, "name") else "media",
                 file=file,
-                **upload_kwargs,
+                **api_kwargs,
             )
         except TweepyException as exc:
             raise self._convert_exception(exc) from exc
