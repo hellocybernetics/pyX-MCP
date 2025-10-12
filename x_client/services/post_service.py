@@ -5,6 +5,7 @@ Post related workflows built on top of client adapters.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Protocol, Sequence
 
@@ -90,7 +91,7 @@ class PostService:
             payload["media_ids"] = media_id_list
             payload["user_auth"] = True
         if in_reply_to:
-            payload["reply"] = {"in_reply_to_post_id": in_reply_to}
+            payload["in_reply_to_tweet_id"] = in_reply_to
         if quote_post_id:
             payload["quote_post_id"] = quote_post_id
         if reply_settings:
@@ -215,6 +216,7 @@ class PostService:
         chunk_limit: int = 280,
         in_reply_to: str | None = None,
         rollback_on_failure: bool = True,
+        segment_pause: float = 0.0,
         **extra: Any,
     ) -> ThreadCreateResult:
         """Create a thread by splitting text and chaining replies.
@@ -225,6 +227,8 @@ class PostService:
             in_reply_to: Optional post ID to anchor the first entry.
             rollback_on_failure: Delete successfully created posts when a
                 later segment fails to post.
+            segment_pause: Seconds to wait between successful segments to
+                avoid hitting posting rate limits (default 0.0).
             **extra: Additional kwargs forwarded to ``create_post``.
 
         Returns:
@@ -302,6 +306,25 @@ class PostService:
                 "post.thread.segment_success",
                 {"segment_index": index, "post_id": post.id},
             )
+
+            if segment_pause > 0 and index < len(segments) - 1:
+                self.logger.debug(
+                    "post.thread.pause",
+                    extra={
+                        "event": "post.thread.pause",
+                        "segment_index": index,
+                        "next_segment_index": index + 1,
+                        "segment_pause": segment_pause,
+                    },
+                )
+                self._emit_event(
+                    "post.thread.pause",
+                    {
+                        "segment_index": index,
+                        "segment_pause": segment_pause,
+                    },
+                )
+                time.sleep(segment_pause)
 
         self.logger.info(
             "post.thread.success",

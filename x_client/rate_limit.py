@@ -185,11 +185,27 @@ class RateLimitHandler:
                 last_exception = e
 
                 # Update rate limit if available in exception
-                if isinstance(e, RateLimitExceeded) and e.reset_at:
-                    if self._last_rate_limit:
-                        self._last_rate_limit.reset_at = e.reset_at
-                    else:
-                        self._last_rate_limit = RateLimitInfo(reset_at=e.reset_at)
+                waited_for_reset = False
+                if isinstance(e, RateLimitExceeded):
+                    if e.reset_at:
+                        if self._last_rate_limit:
+                            self._last_rate_limit.reset_at = e.reset_at
+                            self._last_rate_limit.remaining = 0
+                        else:
+                            self._last_rate_limit = RateLimitInfo(
+                                remaining=0,
+                                reset_at=e.reset_at,
+                            )
+                        try:
+                            self.wait_if_needed()
+                            waited_for_reset = True
+                        except RateLimitExceeded:
+                            # Unknown reset time even after update -> fall back to backoff
+                            pass
+                    elif self._last_rate_limit is None:
+                        # Without reset info we still want to mark exhaustion so future
+                        # wait_if_needed calls can trigger default handling when headers arrive.
+                        self._last_rate_limit = RateLimitInfo(remaining=0)
 
                 # Check if we should retry
                 if not should_retry(e):
@@ -199,7 +215,11 @@ class RateLimitHandler:
                 if attempt >= self.retry_config.max_retries:
                     raise
 
-                # Calculate and apply backoff
+                if waited_for_reset:
+                    # We've already slept until reset; immediately retry.
+                    continue
+
+                # Calculate and apply backoff when reset info unavailable
                 delay = self.retry_config.calculate_delay(attempt)
                 logger.info(
                     f"Retry attempt {attempt + 1}/{self.retry_config.max_retries} "

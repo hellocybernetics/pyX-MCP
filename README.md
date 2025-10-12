@@ -129,6 +129,18 @@ python examples/create_post.py "Long form update..." --thread --chunk-limit 180
 # ファイルからスレッドを投稿（UTF-8 テキストを想定）
 python examples/create_post.py --thread-file docs/thread_draft.txt
 
+# 日本語の長文スレッド例（280文字未満で適度に改行）
+python examples/create_post.py --thread-file examples/long_thread_ja.txt --chunk-limit 180
+
+# 英語の長文スレッド例（センテンス区切りを維持）
+python examples/create_post.py --thread-file examples/long_thread_en.txt --chunk-limit 240
+
+# レートリミット回避のため各投稿間で 8 秒待つ
+python examples/create_post.py --thread-file examples/long_thread_en.txt --segment-pause 8
+
+# 失敗したスレッドの先頭ツイートを削除（重複エラーの解消に利用）
+python examples/create_post.py --delete 1234567890123456789
+
 # リポスト / リポストの取り消し
 python examples/create_post.py --repost 1234567890
 python examples/create_post.py --undo-repost 1234567890
@@ -137,6 +149,15 @@ python examples/create_post.py --undo-repost 1234567890
 `examples/sample_image.png` をサンプル画像として同梱しているため、動作確認時には `--image examples/sample_image.png` を指定できます。
 
 スレッド投稿はテキストのみサポートしています（API 制約上メディア添付は不可）。`--chunk-limit` で 1 セグメントあたりの文字数上限を調整できます。`--thread-file` を指定すると Markdown/テキストファイルをそのままスレッドとして分割投稿します。
+
+### ロングスレッド投稿における言語別の考慮事項
+- **日本語**: 全角文字が多い場合は 280 文字ギリギリまで詰めると読みづらくなるため、`--chunk-limit` を 150-200 文字程度に抑えて文節ごとのまとまりを維持してください。また、句読点直後で分割されると文脈が途切れやすいので、テキストファイル側で段落ごとに空行を入れておくと安全です。UTF-8 のまま保存すれば X API で正しく扱われます。
+- **英語**: URL や絵文字を含むときは Twitter 側で 23 文字換算されるため、余裕を持って `--chunk-limit` を設定します。センテンス単位で改行しておくと、分割後も読みやすさが保たれます。また、引用符や Markdown 記法を使う場合は、変換後に 280 文字を超えていないか冒頭のドラフト投稿で必ず確認してください。
+
+スレッドを再投稿する場合、X 側の仕様で 24 時間以内に全く同じ本文を投稿すると **Duplicate content** エラーになります。前回投稿したスレッドを削除するか、テキストにタイムスタンプなどの一意な語句を追加してから再実行してください。`--delete` オプションで先頭ツイートを素早く削除できます。
+
+また、X API は短時間に連続で投稿すると HTTP 429 (Too Many Requests) を返すことがあります。本ライブラリでは `RateLimitExceeded` を検知するとレスポンスヘッダーの `x-rate-limit-reset` に従って待機してから再試行しますが、手動投稿でも同じ制限があるため、429 が発生した場合は 2～3 分ほど待ってからコマンドを再実行してください。
+`--segment-pause` を 5–10 秒程度に設定するとセグメントごとの投稿間隔に余裕を持たせられ、429 を事前に回避しやすくなります。
 
 リポスト操作は本文/メディア不要で、`--repost` で指定 ID をリポスト、`--undo-repost` で取り消します。
 

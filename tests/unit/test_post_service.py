@@ -79,7 +79,7 @@ def test_create_post_builds_payload() -> None:
     assert client.create_kwargs is not None
     assert client.create_kwargs["media_ids"] == [1, 2]
     assert client.create_kwargs["user_auth"] is True
-    assert client.create_kwargs["reply"] == {"in_reply_to_post_id": "99"}
+    assert client.create_kwargs["in_reply_to_tweet_id"] == "99"
     assert client.create_kwargs["quote_post_id"] == "77"
     assert client.create_kwargs["reply_settings"] == "followers"
 
@@ -153,9 +153,36 @@ def test_create_thread_success_builds_chain() -> None:
     # Ensure subsequent posts reply to prior ID
     for index, kwargs in enumerate(client.create_history):
         if index == 0:
-            assert "reply" not in kwargs
+            assert "in_reply_to_tweet_id" not in kwargs
         else:
-            assert kwargs["reply"] == {"in_reply_to_post_id": result.posts[index - 1].id}
+            assert (
+                kwargs["in_reply_to_tweet_id"]
+                == result.posts[index - 1].id
+            )
+
+
+def test_create_thread_applies_segment_pause(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakePostClient()
+    service = PostService(client)
+
+    sleeps: list[float] = []
+
+    def fake_sleep(duration: float) -> None:
+        sleeps.append(duration)
+
+    monkeypatch.setattr("x_client.services.post_service.time.sleep", fake_sleep)
+
+    result = service.create_thread(
+        "segment one segment two segment three segment four",
+        chunk_limit=15,
+        segment_pause=0.5,
+    )
+
+    assert result.succeeded is True
+    # Expect sleep to run between each segment except the last
+    expected_sleeps = max(0, len(client.create_history) - 1)
+    assert len(sleeps) == expected_sleeps
+    assert all(duration == 0.5 for duration in sleeps)
 
 
 def test_create_thread_rolls_back_on_failure() -> None:

@@ -24,9 +24,21 @@ Usage:
     # Post a thread sourced from file contents
     python examples/create_post.py --thread-file notes/thread.txt
 
+    # Japanese long thread example (proactively shortened to keep sentences intact)
+    python examples/create_post.py --thread-file examples/long_thread_ja.txt --chunk-limit 180
+
+    # English long thread example (leave headroom for URLs and emojis)
+    python examples/create_post.py --thread-file examples/long_thread_en.txt --chunk-limit 240
+
+    # Reduce posting cadence to avoid 429 (segment pause of 8 seconds)
+    python examples/create_post.py --thread-file examples/long_thread_en.txt --segment-pause 8
+
     # Repost / undo repost by post ID
     python examples/create_post.py --repost 1234567890
     python examples/create_post.py --undo-repost 1234567890
+
+    # Delete a post by ID (useful when cleaning up failed thread attempts)
+    python examples/create_post.py --delete 1234567890
 
 Requirements:
     Set environment variables or create a .env file with:
@@ -52,6 +64,7 @@ from x_client.exceptions import (
     ConfigurationError,
     MediaProcessingFailed,
     MediaValidationError,
+    RateLimitExceeded,
     XClientError,
 )
 from x_client.factory import XClientFactory
@@ -101,6 +114,12 @@ def main() -> int:
         help="Maximum characters per thread segment (default: 280)",
     )
     parser.add_argument(
+        "--segment-pause",
+        type=float,
+        default=5.0,
+        help="Seconds to wait between thread segments (default: 5.0)",
+    )
+    parser.add_argument(
         "--repost",
         metavar="POST_ID",
         help="Repost the given post ID",
@@ -109,6 +128,11 @@ def main() -> int:
         "--undo-repost",
         metavar="POST_ID",
         help="Undo a repost for the given post ID",
+    )
+    parser.add_argument(
+        "--delete",
+        metavar="POST_ID",
+        help="Delete the given post ID (utility for cleaning failed threads)",
     )
 
     args = parser.parse_args()
@@ -124,9 +148,10 @@ def main() -> int:
 
     thread_mode = bool(args.thread or args.thread_file)
     repost_mode = bool(args.repost or args.undo_repost)
+    delete_mode = bool(args.delete)
 
-    if thread_mode and repost_mode:
-        print("Error: Thread options cannot be combined with repost actions")
+    if sum(int(flag) for flag in (thread_mode, repost_mode, delete_mode)) > 1:
+        print("Error: Choose only one action (thread, repost/undo, or delete)")
         return 1
 
     if args.thread_file and not args.thread_file.exists():
@@ -137,6 +162,9 @@ def main() -> int:
         print("Error: --chunk-limit must be a positive integer")
         return 1
 
+    # Japanese text often uses full-width punctuation, so keeping chunk_limit below 200 avoids
+    # breaking sentences mid-clause. English threads with URLs or emojis should also leave room
+    # because Twitter treats each URL as 23 characters regardless of length.
     if thread_mode and (args.image or args.video):
         print("Error: Thread posting currently supports text-only content")
         return 1
@@ -145,7 +173,11 @@ def main() -> int:
         print("Error: Media attachments are not compatible with repost actions")
         return 1
 
-    if not repost_mode and not (args.text or args.thread_file):
+    if not (thread_mode or repost_mode or delete_mode) and not args.text:
+        print("Error: Provide text for single post actions")
+        return 1
+
+    if thread_mode and not (args.text or args.thread_file):
         print("Error: Provide text or --thread-file for post/thread actions")
         return 1
 
@@ -164,6 +196,17 @@ def main() -> int:
         # Step 3: Initialize services
         post_service = PostService(client)
         media_service = MediaService(client)
+
+        if delete_mode:
+            target_id = args.delete
+            print(f"Deleting post ID: {target_id}")
+            try:
+                post_service.delete_post(target_id)
+            except XClientError as exc:
+                print(f"❌ Failed to delete post: {exc}")
+                return 1
+            print("✅ Post deleted")
+            return 0
 
         # Step 4: Upload media if provided
         if repost_mode:
@@ -220,6 +263,7 @@ def main() -> int:
                 thread_source,
                 chunk_limit=args.chunk_limit,
                 rollback_on_failure=True,
+                segment_pause=max(args.segment_pause, 0.0),
             )
 
             if result.succeeded:
@@ -241,6 +285,11 @@ def main() -> int:
                 print("   The following posts remain published:")
                 for post in result.posts:
                     print(f"     - https://x.com/i/web/status/{post.id}")
+            if isinstance(result.error, RateLimitExceeded):
+                print(
+                    "   Tip: X returned 429 (rate limit). Wait for the"
+                    " reset window (usually a few minutes) before retrying."
+                )
             return 1
 
         post_text = args.text or ""

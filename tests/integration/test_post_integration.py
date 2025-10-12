@@ -161,10 +161,10 @@ def test_create_thread_via_factory_uses_reply_chain(
     # 最初の投稿は reply 指定なし、その後は直前の ID に返信する
     for index, kwargs in enumerate(fake_client.create_calls):
         if index == 0:
-            assert "reply" not in kwargs
+            assert "in_reply_to_tweet_id" not in kwargs
             continue
         expected_anchor = result.posts[index - 1].id
-        assert kwargs["reply"] == {"in_reply_to_post_id": expected_anchor}
+        assert kwargs["in_reply_to_tweet_id"] == expected_anchor
 
 
 def test_repost_and_undo_flow_via_factory(
