@@ -33,6 +33,10 @@ import argparse
 import sys
 from pathlib import Path
 
+# Ensure project root is on sys.path when running as a script (e.g. python examples/post_tweet.py)
+if __package__ is None:  # pragma: no cover - runtime convenience
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 from twitter_client.config import ConfigManager
 from twitter_client.exceptions import (
     ConfigurationError,
