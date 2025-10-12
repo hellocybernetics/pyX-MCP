@@ -36,7 +36,6 @@ logs/
 
 # Environment configuration
 .env
-.env.*
 !.env.example
 
 # Project-specific tooling directories
