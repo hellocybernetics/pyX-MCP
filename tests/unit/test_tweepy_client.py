@@ -148,7 +148,7 @@ def test_search_recent_tweets_delegates() -> None:
     assert v2_client.called_with["search_recent_tweets"][1]["max_results"] == 5
 
 
-def test_upload_media_passes_media_type_for_non_chunked() -> None:
+def test_upload_media_omits_media_type_for_non_chunked() -> None:
     v2_client = StubV2Client()
     v1_api = StubV1API()
     client = TweepyClient(v2_client, v1_api)  # type: ignore[arg-type]
@@ -161,7 +161,7 @@ def test_upload_media_passes_media_type_for_non_chunked() -> None:
     kwargs = v1_api.called_with["media_upload"][1]
     assert kwargs["media_category"] == "tweet_image"
     assert kwargs["chunked"] is False
-    assert kwargs["media_type"] == "image/png"
+    assert "media_type" not in kwargs
 
 
 def test_upload_media_strips_media_type_when_chunked() -> None:
