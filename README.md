@@ -1,16 +1,16 @@
-# X (Twitter) API クライアント
+# X (Twitter) API Client
 
-X (Twitter) API と連携するための Python クライアントです。AI アシスタント（Claude、Gemini など）から MCP 経由で X API を操作できます。
+This is a Python client for integrating with the X (Twitter) API. You can operate the X API from AI assistants (such as Claude, Gemini, etc.) via MCP.
 
-## 本ライブラリの立ち位置
+## Role of this Library
 
-このライブラリは **X API のクライアント**です。MCP サーバーとしても機能しますが、名前の `x_client` は X (Twitter) サーバーに対するクライアントという意味です。
+This library is a **client for the X API**. Although it also functions as an MCP server, the name `x_client` means it is a client for the X (Twitter) server.
 
 ```mermaid
 graph TD
     A["AI Agent<br>Claude / Gemini / Codex etc."] -->|MCP Protocol over stdio| B["MCP Server Entrypoint<br>(x_client.integrations.mcp_server)"]
 
-    %% サブグラフ：IDと表示名を分けてパース安定化
+    %% Subgraph: Stabilize parsing by separating ID and display name
     subgraph x_client_library["x_client Library — Single Python Process"]
         B -->|Internal Call| C["XMCPAdapter"]
         C -->|Internal Call| D["Service Layer<br>(PostService, MediaService)"]
@@ -31,37 +31,37 @@ graph TD
 
 ```
 
-**役割の整理**:
-- **AI Agent (MCP Client)**: Claude Code、Claude Desktop、Gemini などの AI アシスタント
-- **MCP Server**: 本ライブラリが提供する MCP プロトコル対応サーバー
-- **X Client**: 本ライブラリのコア機能。X API に対するクライアント
-- **X Server**: Twitter/X 本体のサーバー
+**Clarification of Roles**:
+- **AI Agent (MCP Client)**: AI assistants like Claude Code, Claude Desktop, Gemini.
+- **MCP Server**: The MCP protocol-compatible server provided by this library.
+- **X Client**: The core function of this library. A client for the X API.
+- **X Server**: The main server of Twitter/X.
 
-つまり、本ライブラリは：
-1. **MCP の視点**: MCP **サーバー**として AI エージェントにツールを提供
-2. **X API の視点**: X API **クライアント**として X サーバーと通信
+In other words, this library has two faces:
+1.  **From the MCP perspective**: It acts as an MCP **server** providing tools to AI agents.
+2.  **From the X API perspective**: It acts as an X API **client** communicating with the X server.
 
-という二つの顔を持っています。MCPではなく、X APIをライブラリとして利用することも可能です。（README.md下部）
+It is also possible to use the X API as a library without MCP (see bottom of README.md).
 
-## 必要条件
-- Python 3.13 以上
-- X (Twitter) 開発者アカウントと API キー一式
-- パッケージ管理ツール [uv](https://docs.astral.sh/uv/)（推奨）
+## Requirements
+- Python 3.13 or higher
+- X (Twitter) developer account and a set of API keys
+- Package management tool [uv](https://docs.astral.sh/uv/) (recommended)
 
-## MCP (Model Context Protocol) で利用する
+## Usage with MCP (Model Context Protocol)
 
-AI アシスタント（Claude Code、Claude Desktop、codex-cli、Gemini など）から X API を操作できます。
+You can operate the X API from AI assistants (such as Claude Code, Claude Desktop, codex-cli, Gemini, etc.).
 
-### 🚀 推奨設定：uvx による統一実行
+### 🚀 Recommended Setup: Unified Execution with uvx
 
-すべての環境で **uvx** を使用することで、依存関係の自動管理、常に最新版への更新が可能です。
+By using **uvx** in all environments, you can get automatic dependency management and always stay up-to-date.
 
-### 設定方法
+### Configuration
 
-各 AI ツールの MCP 設定ファイルに以下を記述します：
+Describe the following in the MCP configuration file of each AI tool:
 
-**TOML 形式 (Codex-CLIなど)**:
-* PyPI公開版
+**TOML format (Codex-CLI, etc.)**:
+*   Published on PyPI
 ```toml
 [mcp.servers.x_client]
 command = "uvx"
@@ -74,7 +74,7 @@ X_ACCESS_TOKEN = "your-access-token"
 X_ACCESS_TOKEN_SECRET = "your-access-token-secret"
 ```
 
-* github最新版
+*   Latest from GitHub
 ```toml
 [mcp.servers.x_client]
 command = "uvx"
@@ -87,9 +87,8 @@ X_ACCESS_TOKEN = "your-access-token"
 X_ACCESS_TOKEN_SECRET = "your-access-token-secret"
 ```
 
-
-**JSON 形式（Claude Code, Gemini CLI など）**:
-* PyPI公開版
+**JSON format (Claude Code, Gemini CLI, etc.)**:
+*   Published on PyPI
 ```json
 {
   "mcpServers": {
@@ -106,7 +105,7 @@ X_ACCESS_TOKEN_SECRET = "your-access-token-secret"
   }
 }
 ```
-* github最新版
+*   Latest from GitHub
 ```json
 {
   "mcpServers": {
@@ -124,146 +123,146 @@ X_ACCESS_TOKEN_SECRET = "your-access-token-secret"
 }
 ```
 
-### 設定ファイルの場所
+### Configuration File Locations
 
 - **Claude Code**: `mcp_settings.json`
-- **codex-cli**: 設定ファイル（TOML/JSON）
+- **codex-cli**: Configuration file (TOML/JSON)
 - **Claude Desktop**:
   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
   - Linux: `~/.config/Claude/claude_desktop_config.json`
-- **Gemini**: `~/.gemini/mcp_config.json` (または Gemini 指定パス)
+- **Gemini**: `~/.gemini/mcp_config.json` (or Gemini specified path)
 
-**重要**: 設定後、AI ツールを完全に再起動してください。
+**Important**: Please restart your AI tool completely after setting it up.
 
-### 動作確認
+### Operation Check
 
-AI アシスタントに以下のように依頼します：
-
-```
-「利用可能な X API ツールを一覧表示して」
-```
-
-または
+Ask your AI assistant as follows:
 
 ```
-「Hello from MCP! と投稿して」
+"List the available X API tools"
 ```
 
-### uvx 設定のメリット
+or
 
-- ✅ **環境非依存**: Node.js 不要、Python 環境のみで動作
-- ✅ **自動依存管理**: uv が仮想環境を自動構築・キャッシュ
-- ✅ **常に最新**: `--from pyx-mcp` により PyPI の最新版を自動取得
-- ✅ **統一的な設定**: すべての AI アシスタントで同じ設定方法
+```
+"Post 'Hello from MCP!'"
+```
+
+### Benefits of uvx setup
+
+- ✅ **Environment Independent**: No Node.js required, works only with a Python environment
+- ✅ **Automatic Dependency Management**: uv automatically builds and caches virtual environments
+- ✅ **Always Up-to-date**: `--from pyx-mcp` automatically gets the latest version from PyPI
+- ✅ **Unified Configuration**: Same configuration method for all AI assistants
 
 ---
 
-## 提供機能
+## Provided Features
 
-MCP 経由で以下のツールが利用可能です：
+The following tools are available via MCP:
 
-### 投稿機能
-- **create_post**: テキスト投稿、画像/動画付き投稿、リプライ、引用投稿
-- **delete_post**: 投稿の削除
-- **get_post**: 投稿IDから投稿を取得
-- **create_thread**: 長文を自動分割してスレッド投稿
+### Posting Features
+- **create_post**: Text posts, posts with images/videos, replies, quote posts
+- **delete_post**: Delete a post
+- **get_post**: Get a post by its ID
+- **create_thread**: Automatically split long text into a thread post
 
-### リポスト機能
-- **repost_post**: 投稿をリポスト
-- **undo_repost**: リポストを取り消し
+### Repost Features
+- **repost_post**: Repost a post
+- **undo_repost**: Undo a repost
 
-### 検索機能
-- **search_recent_posts**: 最近7日間の投稿を検索（著者情報付き）
+### Search Features
+- **search_recent_posts**: Search for posts from the last 7 days (with author information)
 
-### メディアアップロード
-- **upload_image**: 画像アップロード（JPEG/PNG/WebP/GIF、最大5MB）
-- **upload_video**: 動画アップロード（MP4、最大512MB、チャンクアップロード対応）
+### Media Upload
+- **upload_image**: Upload an image (JPEG/PNG/WebP/GIF, max 5MB)
+- **upload_video**: Upload a video (MP4, max 512MB, chunked upload supported)
 
-### 認証・状態確認
-- **get_auth_status**: 認証状態とレート制限情報を取得
+### Authentication and Status Check
+- **get_auth_status**: Get authentication status and rate limit information
 
-### 使用例
-
-```
-あなた: 「Hello from Claude via MCP!」と投稿して
-
-Claude: create_post ツールを使用します...
-       投稿が完了しました！投稿ID: 1234567890
-```
+### Usage Examples
 
 ```
-あなた: 「MCP プロトコル」について最近の投稿を検索して
+You: "Post 'Hello from Claude via MCP!'"
 
-Claude: search_recent_posts ツールを使用します...
-       3件の投稿が見つかりました:
-       1. @user1: MCP を使ってみた...
-       2. @user2: Model Context Protocol は...
+Claude: Using the create_post tool...
+       Post completed! Post ID: 1234567890
 ```
 
-### アーキテクチャ
+```
+You: "Search for recent posts about 'MCP protocol'"
+
+Claude: Using the search_recent_posts tool...
+       Found 3 posts:
+       1. @user1: I tried using MCP...
+       2. @user2: Model Context Protocol is...
+```
+
+### Architecture
 
 ```
-AI アシスタント ↔ MCP Server (stdio) ↔ XMCPAdapter ↔ Service Layer ↔ X API
+AI Assistant ↔ MCP Server (stdio) ↔ XMCPAdapter ↔ Service Layer ↔ X API
 ```
 
-### エラーハンドリング
+### Error Handling
 
-- **ConfigurationError**: 認証情報不足。`.env` と環境変数を確認
-- **AuthenticationError**: トークン失効。OAuth フローを再実行
-- **RateLimitExceeded**: レート制限到達。`reset_at` を参照してバックオフを実施
-- **MediaProcessingTimeout/Failed**: 動画処理の完了待機がタイムアウト。`timeout` や動画品質を調整
+- **ConfigurationError**: Missing authentication information. Check `.env` and environment variables.
+- **AuthenticationError**: Token expired. Re-run the OAuth flow.
+- **RateLimitExceeded**: Rate limit reached. Back off with reference to `reset_at`.
+- **MediaProcessingTimeout/Failed**: Timed out waiting for video processing to complete. Adjust `timeout` and video quality.
 
-### トラブルシューティング
+### Troubleshooting
 
-- **Missing credentials**: `echo $X_API_KEY` で環境変数を確認。`.env` が 0o600 で保存されているか確認
-- **Invalid token**: OAuth フローを再実行して認証情報を更新
-- **Video timeout**: `upload_video` の `timeout` を延長するか、`ffmpeg` で再エンコード
+- **Missing credentials**: Check environment variables with `echo $X_API_KEY`. Check if `.env` is saved with `0o600`.
+- **Invalid token**: Re-run the OAuth flow to update authentication information.
+- **Video timeout**: Extend the `timeout` of `upload_video` or re-encode with `ffmpeg`.
 
 ---
 
-## ライブラリとして利用する
+## Using as a Library
 
-Python コードから直接呼び出すことも可能です。
+It can also be called directly from Python code.
 
-### インストール
+### Installation
 
 ```bash
 uv add pyx-mcp
 ```
 
-### 認証情報の取得方法
+### How to get authentication information
 
-本ライブラリを使用するには、X (Twitter) の開発者アカウントから以下の4つの認証情報を取得する必要があります。
+To use this library, you need to get the following four pieces of authentication information from your X (Twitter) developer account.
 
-1.  **X Developer Portalにアクセス**:
-    -   [https://developer.x.com/en/portal/dashboard](https://developer.x.com/en/portal/dashboard) にアクセスし、ログインします。
+1.  **Access the X Developer Portal**:
+    -   Go to [https://developer.x.com/en/portal/dashboard](https://developer.x.com/en/portal/dashboard) and log in.
 
-2.  **アプリケーションの選択または作成**:
-    -   既存のアプリケーションを選択するか、新しいアプリケーションを作成します。
+2.  **Select or create an application**:
+    -   Select an existing application or create a new one.
 
-3.  **キーとトークンの確認**:
-    -   アプリケーションのダッシュボードで、「Keys and Tokens」タブに移動します。
+3.  **Check keys and tokens**:
+    -   On the application dashboard, go to the "Keys and Tokens" tab.
 
-4.  **生成と権限設定**:
-    -   **API Key and Secret**: 「Consumer Keys」セクションで確認または再生成します。
-    -   **Access Token and Secret**: 「Authentication Tokens」セクションで、**Read and Write** (読み書き) 権限を持つアクセストークンとシークレットを生成します。
+4.  **Generate and set permissions**:
+    -   **API Key and Secret**: Check or regenerate in the "Consumer Keys" section.
+    -   **Access Token and Secret**: In the "Authentication Tokens" section, generate an access token and secret with **Read and Write** permissions.
 
-取得したこれらの値を、後述する環境変数または `.env` ファイルに設定してください。
+Set these retrieved values in the environment variables or `.env` file described below.
 
-## 認証情報の設定
+## Setting Authentication Information
 
-環境変数または `.env` ファイルで認証情報を設定します：
+Set the authentication information with environment variables or an `.env` file:
 
 ```bash
 export X_API_KEY="your_api_key"
 export X_API_SECRET="your_api_secret"
 export X_ACCESS_TOKEN="your_access_token"
 export X_ACCESS_TOKEN_SECRET="your_access_token_secret"
-export X_BEARER_TOKEN="your_bearer_token"  # v2 API用（オプション）
+export X_BEARER_TOKEN="your_bearer_token"  # for v2 API (optional)
 ```
 
-または `.env` ファイル（プロジェクト直下に配置）:
+Or in an `.env` file (placed in the project root):
 ```bash
 X_API_KEY=your_api_key
 X_API_SECRET=your_api_secret
@@ -272,11 +271,11 @@ X_ACCESS_TOKEN_SECRET=your_access_token_secret
 X_BEARER_TOKEN=your_bearer_token
 ```
 
-`.env` は自動的に 0o600（所有者のみ読み書き可）に設定されます。`.env*` は `.gitignore` 済みです。
+`.env` is automatically set to `0o600` (owner read/write only). `.env*` is `.gitignore`d.
 
 ---
 
-### 基本的な使い方
+### Basic Usage
 
 ```python
 from x_client.config import ConfigManager
@@ -284,19 +283,19 @@ from x_client.factory import XClientFactory
 from x_client.services.post_service import PostService
 from x_client.services.media_service import MediaService
 
-# 1. 認証情報を読み込み
+# 1. Load authentication information
 config = ConfigManager()
 client = XClientFactory.create_from_config(config)
 
-# 2. サービス層を初期化
+# 2. Initialize the service layer
 post_service = PostService(client)
 media_service = MediaService(client)
 
-# 3. 投稿を作成
+# 3. Create a post
 post = post_service.create_post(text="Hello from x_client!")
 print(f"Post created: {post.id}")
 
-# 4. 画像付き投稿
+# 4. Post with an image
 from pathlib import Path
 media_result = media_service.upload_image(Path("image.png"))
 post = post_service.create_post(
@@ -304,9 +303,9 @@ post = post_service.create_post(
     media_ids=[media_result.media_id]
 )
 
-# 5. 長文スレッド投稿
+# 5. Post a long thread
 thread = post_service.create_thread(
-    """Python 3.13 highlights... (long text)""",
+    '''Python 3.13 highlights... (long text)''',
     chunk_limit=200,
 )
 for idx, segment_post in enumerate(thread.posts, start=1):
@@ -314,14 +313,14 @@ for idx, segment_post in enumerate(thread.posts, start=1):
 if not thread.succeeded:
     print("Thread failed", thread.error)
 
-# 6. リポスト操作
+# 6. Repost operation
 repost_state = post_service.repost_post(post.id)
 print("Reposted:", repost_state.reposted)
 
 undo_state = post_service.undo_repost(post.id)
 print("Repost removed:", not undo_state.reposted)
 
-# 7. 著者情報付き検索
+# 7. Search with author information
 search_results = post_service.search_recent(
     "from:twitterdev",
     expansions=["author_id"],
@@ -333,14 +332,14 @@ for item in search_results:
     print(author, item.text)
 ```
 
-### MCP アダプター経由での利用（上記のAPI簡易版となる）
+### Usage via MCP Adapter (a simplified version of the above API)
 
-MCP クライアント以外からも直接呼び出せます：
+It can also be called directly from other than MCP clients:
 
 ```python
 from x_client.integrations.mcp_adapter import XMCPAdapter
 
-adapter = XMCPAdapter()  # 認証情報は ConfigManager が自動読み込み
+adapter = XMCPAdapter()  # Authentication information is automatically loaded by ConfigManager
 
 post = adapter.create_post({"text": "Hello from MCP!"})
 print(post)
@@ -349,9 +348,9 @@ media = adapter.upload_image({"path": "/path/to/image.png"})
 adapter.create_post({"text": "Image post", "media_ids": [media["media_id"]]})
 ```
 
-### ロギングと可観測性
+### Logging and Observability
 
-`PostService` には構造化ログとイベントフックが組み込まれています：
+`PostService` has structured logging and event hooks built in:
 
 ```python
 import logging
@@ -364,31 +363,31 @@ logging.basicConfig(level=logging.INFO)
 client = XClientFactory.create_from_config(ConfigManager())
 
 def metrics_hook(event: str, payload: dict[str, object]) -> None:
-    # Prometheus / OpenTelemetry などへの連携ポイント
+    # Integration point for Prometheus / OpenTelemetry, etc.
     print("metrics", event, payload)
 
 post_service = PostService(client, event_hook=metrics_hook)
 post_service.create_post("observability ready!")
 ```
 
-イベントフックは成功・失敗双方を単一コールバックへ集約するため、メトリクス送出や分散トレーシングとの連携が容易です。
+The event hook consolidates both success and failure into a single callback, making it easy to send metrics and integrate with distributed tracing.
 
 ---
 
-## 開発環境での利用
+## Usage in a Development Environment
 
-### セットアップ
+### Setup
 
 ```bash
 cd /path/to/twitter
 uv pip install -e .
 ```
 
-これにより `x-mcp-server` コマンドが `.venv/bin/` に作成されます。
+This will create the `x-mcp-server` command in `.venv/bin/`.
 
-### MCP サーバーをローカルパスで実行
+### Running the MCP Server with a Local Path
 
-開発中の MCP サーバーを直接実行する場合：
+To run the MCP server under development directly:
 
 ```json
 {
@@ -407,9 +406,9 @@ uv pip install -e .
 ```
 
 <details>
-<summary>代替方法 (クリックして展開)</summary>
+<summary>Alternative methods (click to expand)</summary>
 
-**方法2: uv 直接使用**
+**Method 2: Direct use of uv**
 ```json
 {
   "mcpServers": {
@@ -427,7 +426,7 @@ uv pip install -e .
 }
 ```
 
-**方法3: ランチャースクリプト**
+**Method 3: Launcher script**
 ```json
 {
   "mcpServers": {
@@ -440,113 +439,113 @@ uv pip install -e .
 ```
 </details>
 
-**重要**: `/absolute/path/to/twitter` を実際のプロジェクトパスに置き換えてください。
+**Important**: Replace `/absolute/path/to/twitter` with the actual project path.
 
 ---
 
-## CLI で利用する
+## Usage with CLI
 
-`examples/create_post.py` を使うと、コマンドラインから簡単に投稿できます。
+You can easily post from the command line using `examples/create_post.py`.
 
-### 基本的な使い方
+### Basic Usage
 
 ```bash
-# テキストのみ
+# Text only
 python examples/create_post.py "Hello from x_client!"
 
-# 画像付き
+# With image
 python examples/create_post.py "Check out this image!" --image path/to/image.png
 
-# 動画付き（最大512MB、チャンクアップロード対応）
+# With video (max 512MB, chunked upload supported)
 python examples/create_post.py "Check out this video!" --video path/to/video.mp4
 
-# 別パスの .env を利用
+# Use .env from a different path
 python examples/create_post.py "Hello with custom env" --dotenv /secure/path/.env
 ```
 
-### スレッド投稿
+### Thread Posting
 
 ```bash
-# 長文スレッド投稿（chunk_limit=180 で自動分割）
+# Long thread post (auto-split with chunk_limit=180)
 python examples/create_post.py "Long form update..." --thread --chunk-limit 180
 
-# ファイルからスレッドを投稿（UTF-8 テキストを想定）
+# Post a thread from a file (assuming UTF-8 text)
 python examples/create_post.py --thread-file docs/thread_draft.txt
 
-# 日本語の長文スレッド例（280文字未満で適度に改行）
+# Example of a long Japanese thread (break lines appropriately under 280 characters)
 python examples/create_post.py --thread-file examples/long_thread_ja.txt --chunk-limit 180
 
-# 英語の長文スレッド例（センテンス区切りを維持）
+# Example of a long English thread (maintaining sentence breaks)
 python examples/create_post.py --thread-file examples/long_thread_en.txt --chunk-limit 240
 
-# レートリミット回避のため各投稿間で 8 秒待つ
+# Wait 8 seconds between each post to avoid rate limits
 python examples/create_post.py --thread-file examples/long_thread_en.txt --segment-pause 8
 ```
 
-### その他の操作
+### Other Operations
 
 ```bash
-# 失敗したスレッドの先頭ツイートを削除（重複エラーの解消に利用）
+# Delete the first tweet of a failed thread (used to resolve duplicate errors)
 python examples/create_post.py --delete 1234567890123456789
 
-# リポスト / リポストの取り消し
+# Repost / Undo repost
 python examples/create_post.py --repost 1234567890
 python examples/create_post.py --undo-repost 1234567890
 ```
 
-### 言語別の考慮事項
+### Language-specific considerations
 
-- **日本語**: 全角文字が多い場合は 280 文字ギリギリまで詰めると読みづらくなるため、`--chunk-limit` を 150-200 文字程度に抑えて文節ごとのまとまりを維持してください。また、句読点直後で分割されると文脈が途切れやすいので、テキストファイル側で段落ごとに空行を入れておくと安全です。
+- **Japanese**: If there are many full-width characters, filling up to the 280-character limit can make it difficult to read, so keep `--chunk-limit` to around 150-200 characters to maintain chunks for each phrase. Also, since splitting immediately after a punctuation mark can break the context, it is safe to insert a blank line for each paragraph on the text file side.
 
-- **英語**: URL や絵文字を含むときは Twitter 側で 23 文字換算されるため、余裕を持って `--chunk-limit` を設定します。センテンス単位で改行しておくと、分割後も読みやすさが保たれます。
+- **English**: When including URLs or emojis, Twitter counts them as 23 characters, so set `--chunk-limit` with a margin. If you add a line break for each sentence, it will be easier to read after splitting.
 
-### 注意事項
+### Notes
 
-- スレッドを再投稿する場合、X 側の仕様で 24 時間以内に全く同じ本文を投稿すると **Duplicate content** エラーになります。前回投稿したスレッドを削除するか、テキストにタイムスタンプなどの一意な語句を追加してください。
+- When re-posting a thread, if you post the exact same body text within 24 hours, you will get a **Duplicate content** error due to X's specifications. Please delete the previously posted thread or add a unique phrase such as a timestamp to the text.
 
-- X API は短時間に連続で投稿すると HTTP 429 (Too Many Requests) を返すことがあります。本ライブラリでは `RateLimitExceeded` を検知するとレスポンスヘッダーの `x-rate-limit-reset` に従って待機してから再試行しますが、429 が発生した場合は 2～3 分ほど待ってからコマンドを再実行してください。`--segment-pause` を 5–10 秒程度に設定すると 429 を事前に回避しやすくなります。
+- The X API may return HTTP 429 (Too Many Requests) if you post continuously in a short period of time. This library detects `RateLimitExceeded` and waits according to `x-rate-limit-reset` in the response header before retrying, but if a 429 occurs, please wait 2-3 minutes before re-executing the command. Setting `--segment-pause` to about 5–10 seconds makes it easier to avoid 429 in advance.
 
 
 ---
 
-## テスト
+## Tests
 
 ```bash
-# MCP サーバーの動作テスト
+# Test MCP server operation
 uv run python scripts/test_mcp_server.py
 
-# ユニットテスト
+# Unit tests
 uv run pytest tests/unit/test_mcp_adapter.py -v
 
-# 全テスト実行
+# Run all tests
 uv run pytest
 
-# カバレッジ付き実行
+# Run with coverage
 uv run pytest --cov=x_client --cov-report=html
 
-# 詳細モード
+# Verbose mode
 uv run pytest -v
 
-# 特定のテストファイル
+# Specific test file
 uv run pytest tests/unit/test_tweepy_client.py
 ```
 
 ---
 
-## 主な機能
+## Main Features
 
-- デュアルクライアント構成：投稿は tweepy.Client (v2)、メディアは tweepy.API (v1.1)
-- `.env` を用いた安全な認証情報管理と OAuth フロー統合
-- `PostService` / `MediaService` による高レベル API
-- 長文スレッド投稿ユーティリティと自動リプライチェーン構築
-- リポスト／取り消し API と MCP ツール
-- 検索 API の expansions／fields 指定対応と著者情報解決
-- サービス層に組み込まれた構造化ログとイベントフック
-- MCP (Model Context Protocol) 統合による AI アシスタントからの操作
+- Dual client configuration: tweepy.Client (v2) for posts, tweepy.API (v1.1) for media
+- Secure authentication information management using `.env` and OAuth flow integration
+- High-level API with `PostService` / `MediaService`
+- Long thread posting utility and automatic reply chain construction
+- Repost/undo API and MCP tools
+- Support for specifying expansions/fields in the search API and resolving author information
+- Structured logging and event hooks built into the service layer
+- Operation from AI assistants via MCP (Model Context Protocol) integration
 
 
 ---
 
-## サポート
+## Support
 
-バグ報告や改善提案は issue もしくは pull request でお知らせください。プロジェクト方針や設計に関する詳細は `docs/` を参照のうえ、必要に応じてコメントを追加してください。
+Please report bugs and suggestions for improvement via issues or pull requests. For details on project policies and design, please refer to `docs/` and add comments as necessary.
