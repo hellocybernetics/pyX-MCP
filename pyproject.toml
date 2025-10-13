@@ -1,6 +1,6 @@
 [project]
 name = "pyx-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "X (Twitter) API client library with tweepy and pydantic"
 readme = "README.md"
 requires-python = ">=3.13"
