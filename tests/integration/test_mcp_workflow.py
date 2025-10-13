@@ -342,8 +342,7 @@ def test_auth_status_workflow(adapter):
 
     # Should return authenticated status based on test credentials
     assert result["authenticated"] is True
-    # user_id and rate_limit are not implemented yet
-    assert "user_id" not in result or result["user_id"] is None
+    assert isinstance(result["user_id"], str)
 
 
 # ============================================================================

@@ -21,6 +21,7 @@ Configuration:
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import logging
@@ -30,6 +31,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from x_client import __version__
 from x_client.integrations.mcp_adapter import XMCPAdapter
 
 # Configure logging
@@ -53,7 +55,7 @@ class XMCPServer:
         """Initialize the MCP server."""
         self.server = Server(
             name="x-client",
-            version="0.1.0",
+            version=__version__,
             instructions=(
                 "X API MCP Server - Provides tools for posting, searching, "
                 "and managing content on X (formerly Twitter). "
@@ -160,7 +162,7 @@ class XMCPServer:
                     )
                 ]
 
-    async def run(self) -> None:
+    async def run_stdio(self) -> None:
         """
         Run the MCP server with stdio transport.
 
@@ -180,15 +182,19 @@ class XMCPServer:
             )
 
 
-async def async_main() -> None:
+async def async_main(args: argparse.Namespace) -> None:
     """
     Async entry point for the MCP server.
 
-    Creates and runs the server instance.
+    Creates and runs the server instance based on parsed arguments.
     """
     try:
         server = XMCPServer()
-        await server.run()
+        if args.stdio:
+            await server.run_stdio()
+        else:
+            # Default to stdio if no mode is specified
+            await server.run_stdio()
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
     except Exception as e:
@@ -205,7 +211,15 @@ def main() -> None:
     2. Entry point is invoked: `uvx --from . x-mcp-server`
     3. Installed command is run: `x-mcp-server` (after `uv pip install -e .`)
     """
-    asyncio.run(async_main())
+    parser = argparse.ArgumentParser(description="X API MCP Server")
+    parser.add_argument(
+        "--stdio",
+        action="store_true",
+        help="Run server with stdio transport (default)",
+    )
+    args = parser.parse_args()
+
+    asyncio.run(async_main(args))
 
 
 if __name__ == "__main__":

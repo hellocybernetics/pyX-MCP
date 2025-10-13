@@ -11,6 +11,7 @@ tool interfaces for AI assistants. It handles:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -372,19 +373,20 @@ class XMCPAdapter:
     # ========================================================================
 
     def _extract_user_id(self, creds: XCredentials) -> str | None:
-        """Extract user ID from OAuth1 access token if possible."""
+        """Extract or derive a stable identifier from the OAuth1 access token."""
         token = creds.access_token
         if not token:
             return None
 
-        if "-" not in token:
-            return None
+        if "-" in token:
+            candidate = token.split("-", 1)[0]
+            if candidate.isdigit():
+                return candidate
 
-        candidate = token.split("-", 1)[0]
-        if candidate.isdigit():
-            return candidate
-
-        return None
+        # Fall back to a deterministic, anonymised identifier so callers still
+        # receive a string without exposing the raw access token.
+        digest = sha256(token.encode("utf-8")).hexdigest()[:12]
+        return f"token-{digest}"
 
     def _get_rate_limit_info(self) -> RateLimitInfoResponse | None:
         """Retrieve last known rate limit information from the post service."""
@@ -549,12 +551,12 @@ class XMCPAdapter:
                 "output_schema": SearchRecentPostsResponse.model_json_schema(),
             },
             "upload_image": {
-                "description": "Upload an image file (max 5MB, JPEG/PNG/WebP/GIF)",
+                "description": "Upload an image file (max 5MB, JPEG/PNG/WebP/GIF). Please provide an absolute file path.",
                 "input_schema": UploadImageRequest.model_json_schema(),
                 "output_schema": MediaUploadResponse.model_json_schema(),
             },
             "upload_video": {
-                "description": "Upload a video file (max 512MB, MP4 with H.264/AAC)",
+                "description": "Upload a video file (max 512MB, MP4 with H.264/AAC). Please provide an absolute file path.",
                 "input_schema": UploadVideoRequest.model_json_schema(),
                 "output_schema": MediaUploadResponse.model_json_schema(),
             },
