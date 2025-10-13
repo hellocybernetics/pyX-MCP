@@ -9,6 +9,7 @@ __pycache__/
 venv/
 env/
 .python-version
+uv.lock
 
 # Test and coverage artifacts
 .pytest_cache/
