@@ -370,8 +370,7 @@ The event hook consolidates both success and failure into a single callback, mak
 ### Setup
 
 ```bash
-cd /path/to/twitter
-uv pip install -e .
+uv sync
 ```
 
 This will create the `x-mcp-server` command in `.venv/bin/`.

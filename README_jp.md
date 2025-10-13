@@ -370,8 +370,7 @@ post_service.create_post("observability ready!")
 ### セットアップ
 
 ```bash
-cd /path/to/twitter
-uv pip install -e .
+uv sync
 ```
 
 これにより `x-mcp-server` コマンドが `.venv/bin/` に作成されます。
