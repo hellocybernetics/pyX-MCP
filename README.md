@@ -123,15 +123,6 @@ X_ACCESS_TOKEN_SECRET = "your-access-token-secret"
 }
 ```
 
-### Configuration File Locations
-
-- **Claude Code**: `mcp_settings.json`
-- **codex-cli**: Configuration file (TOML/JSON)
-- **Claude Desktop**:
-  - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-  - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-  - Linux: `~/.config/Claude/claude_desktop_config.json`
-- **Gemini**: `~/.gemini/mcp_config.json` (or Gemini specified path)
 
 **Important**: Please restart your AI tool completely after setting it up.
 
