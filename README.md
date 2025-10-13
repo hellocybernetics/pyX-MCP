@@ -1,34 +1,227 @@
-# X (Twitter) API クライアント リデザイン
+# X (Twitter) API クライアント
 
-X (Twitter) API と連携するための Python クライアントです。tweepy をベースに v2 API (投稿) と v1.1 API (メディアアップロード) を統合し、シンプルに運用できるよう再設計しました。
+X (Twitter) API と連携するための Python クライアントです。AI アシスタント（Claude、Gemini など）から MCP 経由で X API を操作できます。
 
-## 主な機能
-- デュアルクライアント構成：投稿は tweepy.Client (v2)、メディアは tweepy.API (v1.1)
-- `.env` を用いた安全な認証情報管理と OAuth フロー統合
-- `PostService` / `MediaService` による高レベル API
-- `examples/create_post.py` による CLI からの投稿デモ
-- 長文スレッド投稿ユーティリティと自動リプライチェーン構築
-- リポスト／取り消し API と MCP ツール
-- 検索 API の expansions／fields 指定対応と著者情報解決
-- サービス層に組み込まれた構造化ログとイベントフック
-- **MCP (Model Context Protocol) 統合**: AI アシスタントから X API を操作可能
+## 本ライブラリの立ち位置
+
+このライブラリは **X API のクライアント**です。MCP サーバーとしても機能しますが、名前の `x_client` は X (Twitter) サーバーに対するクライアントという意味です。
+
+```mermaid
+graph TD
+    A["AI Agent<br>Claude / Gemini / Codex etc."] -->|MCP Protocol over stdio| B["MCP Server Entrypoint<br>(x_client.integrations.mcp_server)"]
+
+    %% サブグラフ：IDと表示名を分けてパース安定化
+    subgraph x_client_library["x_client Library — Single Python Process"]
+        B -->|Internal Call| C["XMCPAdapter"]
+        C -->|Internal Call| D["Service Layer<br>(PostService, MediaService)"]
+        D -->|Internal Call| E["Client Layer<br>(TweepyClient)"]
+        D -->|Internal Call| F["Client Layer<br>(OriginalClient ...future)"]
+    end
+
+    E -->|X API HTTP / REST| G["X Server<br>Twitter (X)"]
+    F -->|X API HTTP / REST| G["X Server<br>Twitter (X)"]
+
+    style B fill:#e1f5ff
+    style C fill:#e1f5ff
+    style D fill:#e1f5ff
+    style E fill:#e1f5ff
+    style F fill:#e1f5ff
+    style A fill:#fff4e6
+    style G fill:#f3e5f5
+
+```
+
+**役割の整理**:
+- **AI Agent (MCP Client)**: Claude Code、Claude Desktop、Gemini などの AI アシスタント
+- **MCP Server**: 本ライブラリが提供する MCP プロトコル対応サーバー
+- **X Client**: 本ライブラリのコア機能。X API に対するクライアント
+- **X Server**: Twitter/X 本体のサーバー
+
+つまり、本ライブラリは：
+1. **MCP の視点**: MCP **サーバー**として AI エージェントにツールを提供
+2. **X API の視点**: X API **クライアント**として X サーバーと通信
+
+という二つの顔を持っています。MCPではなく、X APIをライブラリとして利用することも可能です。（README.md下部）
 
 ## 必要条件
 - Python 3.13 以上
 - X (Twitter) 開発者アカウントと API キー一式
 - パッケージ管理ツール [uv](https://docs.astral.sh/uv/)（推奨）
 
-## インストール
-```bash
-uv sync
+## MCP (Model Context Protocol) で利用する
+
+AI アシスタント（Claude Code、Claude Desktop、codex-cli、Gemini など）から X API を操作できます。
+
+### 🚀 推奨設定：uvx による統一実行
+
+すべての環境で **uvx** を使用することで、依存関係の自動管理、常に最新版への更新が可能です。
+
+### 設定方法
+
+各 AI ツールの MCP 設定ファイルに以下を記述します：
+
+**TOML 形式**:
+```toml
+[mcp.servers.x_client]
+command = "uvx"
+args = ["--from", "pyx-mcp", "x-mcp-server"]
+
+[mcp.servers.x_client.env]
+X_API_KEY = "your-api-key"
+X_API_SECRET = "your-api-secret"
+X_ACCESS_TOKEN = "your-access-token"
+X_ACCESS_TOKEN_SECRET = "your-access-token-secret"
 ```
 
-### 認証情報の設定
-`.env` または環境変数で認証情報を設定します。`.env` は初回保存時に自動的に 0o600（所有者のみ読み書き可）になります。
+**JSON 形式**:
+```json
+{
+  "mcpServers": {
+    "x_client": {
+      "command": "uvx",
+      "args": ["--from", "pyx-mcp", "x-mcp-server"],
+      "env": {
+        "X_API_KEY": "your-api-key",
+        "X_API_SECRET": "your-api-secret",
+        "X_ACCESS_TOKEN": "your-access-token",
+        "X_ACCESS_TOKEN_SECRET": "your-access-token-secret"
+      }
+    }
+  }
+}
+```
 
-1. **Python 3.13+** を想定。パッケージ管理には `uv` を利用。
-2. 依存関係インストール: `uv sync`
-環境変数で設定する場合（推奨）:
+### 設定ファイルの場所
+
+- **Claude Code**: `mcp_settings.json`
+- **codex-cli**: 設定ファイル（TOML/JSON）
+- **Claude Desktop**:
+  - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+  - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+  - Linux: `~/.config/Claude/claude_desktop_config.json`
+- **Gemini**: `~/.gemini/mcp_config.json` (または Gemini 指定パス)
+
+**重要**: 設定後、AI ツールを完全に再起動してください。
+
+### 動作確認
+
+AI アシスタントに以下のように依頼します：
+
+```
+「利用可能な X API ツールを一覧表示して」
+```
+
+または
+
+```
+「Hello from MCP! と投稿して」
+```
+
+### uvx 設定のメリット
+
+- ✅ **環境非依存**: Node.js 不要、Python 環境のみで動作
+- ✅ **自動依存管理**: uv が仮想環境を自動構築・キャッシュ
+- ✅ **常に最新**: `--from pyx-mcp` により PyPI の最新版を自動取得
+- ✅ **統一的な設定**: すべての AI アシスタントで同じ設定方法
+
+---
+
+## 提供機能
+
+MCP 経由で以下のツールが利用可能です：
+
+### 投稿機能
+- **create_post**: テキスト投稿、画像/動画付き投稿、リプライ、引用投稿
+- **delete_post**: 投稿の削除
+- **get_post**: 投稿IDから投稿を取得
+- **create_thread**: 長文を自動分割してスレッド投稿
+
+### リポスト機能
+- **repost_post**: 投稿をリポスト
+- **undo_repost**: リポストを取り消し
+
+### 検索機能
+- **search_recent_posts**: 最近7日間の投稿を検索（著者情報付き）
+
+### メディアアップロード
+- **upload_image**: 画像アップロード（JPEG/PNG/WebP/GIF、最大5MB）
+- **upload_video**: 動画アップロード（MP4、最大512MB、チャンクアップロード対応）
+
+### 認証・状態確認
+- **get_auth_status**: 認証状態とレート制限情報を取得
+
+### 使用例
+
+```
+あなた: 「Hello from Claude via MCP!」と投稿して
+
+Claude: create_post ツールを使用します...
+       投稿が完了しました！投稿ID: 1234567890
+```
+
+```
+あなた: 「MCP プロトコル」について最近の投稿を検索して
+
+Claude: search_recent_posts ツールを使用します...
+       3件の投稿が見つかりました:
+       1. @user1: MCP を使ってみた...
+       2. @user2: Model Context Protocol は...
+```
+
+### アーキテクチャ
+
+```
+AI アシスタント ↔ MCP Server (stdio) ↔ XMCPAdapter ↔ Service Layer ↔ X API
+```
+
+### エラーハンドリング
+
+- **ConfigurationError**: 認証情報不足。`.env` と環境変数を確認
+- **AuthenticationError**: トークン失効。OAuth フローを再実行
+- **RateLimitExceeded**: レート制限到達。`reset_at` を参照してバックオフを実施
+- **MediaProcessingTimeout/Failed**: 動画処理の完了待機がタイムアウト。`timeout` や動画品質を調整
+
+### トラブルシューティング
+
+- **Missing credentials**: `echo $X_API_KEY` で環境変数を確認。`.env` が 0o600 で保存されているか確認
+- **Invalid token**: OAuth フローを再実行して認証情報を更新
+- **Video timeout**: `upload_video` の `timeout` を延長するか、`ffmpeg` で再エンコード
+
+---
+
+## ライブラリとして利用する
+
+Python コードから直接呼び出すことも可能です。
+
+### インストール
+
+```bash
+uv add pyx-mcp
+```
+
+### 認証情報の取得方法
+
+本ライブラリを使用するには、X (Twitter) の開発者アカウントから以下の4つの認証情報を取得する必要があります。
+
+1.  **X Developer Portalにアクセス**:
+    -   [https://developer.x.com/en/portal/dashboard](https://developer.x.com/en/portal/dashboard) にアクセスし、ログインします。
+
+2.  **アプリケーションの選択または作成**:
+    -   既存のアプリケーションを選択するか、新しいアプリケーションを作成します。
+
+3.  **キーとトークンの確認**:
+    -   アプリケーションのダッシュボードで、「Keys and Tokens」タブに移動します。
+
+4.  **生成と権限設定**:
+    -   **API Key and Secret**: 「Consumer Keys」セクションで確認または再生成します。
+    -   **Access Token and Secret**: 「Authentication Tokens」セクションで、**Read and Write** (読み書き) 権限を持つアクセストークンとシークレットを生成します。
+
+取得したこれらの値を、後述する環境変数または `.env` ファイルに設定してください。
+
+## 認証情報の設定
+
+環境変数または `.env` ファイルで認証情報を設定します：
+
 ```bash
 export X_API_KEY="your_api_key"
 export X_API_SECRET="your_api_secret"
@@ -37,9 +230,8 @@ export X_ACCESS_TOKEN_SECRET="your_access_token_secret"
 export X_BEARER_TOKEN="your_bearer_token"  # v2 API用（オプション）
 ```
 
-`.env` ファイルを利用する場合（プロジェクト直下に配置）:
+または `.env` ファイル（プロジェクト直下に配置）:
 ```bash
-# .env
 X_API_KEY=your_api_key
 X_API_SECRET=your_api_secret
 X_ACCESS_TOKEN=your_access_token
@@ -47,10 +239,11 @@ X_ACCESS_TOKEN_SECRET=your_access_token_secret
 X_BEARER_TOKEN=your_bearer_token
 ```
 
-`.env` はリポジトリ直下に置くと `ConfigManager` が自動的に読み込みます。別パスを使う場合は `ConfigManager(dotenv_path=Path("/path/to/.env"))` のように明示してください。 `.env*` は `.gitignore` 済みのため、バージョン管理に含めないでください。OAuth フロー経由で取得したトークンは `ConfigManager.save_credentials()` により `.env` に追記されます。
+`.env` は自動的に 0o600（所有者のみ読み書き可）に設定されます。`.env*` は `.gitignore` 済みです。
 
-## ライブラリとして利用する
-クライアントをコードから直接呼び出すには、以下のようにインポートしてください。
+---
+
+### 基本的な使い方
 
 ```python
 from x_client.config import ConfigManager
@@ -107,67 +300,28 @@ for item in search_results:
     print(author, item.text)
 ```
 
-## CLI で試す
-`examples/create_post.py` を使うと、簡単に投稿を試せます。
+### MCP アダプター経由での利用（上記のAPI簡易版となる）
 
-```bash
-# テキストのみ
-python examples/create_post.py "Hello from x_client!"
+MCP クライアント以外からも直接呼び出せます：
 
-# 画像付き
-python examples/create_post.py "Check out this image!" --image path/to/image.png
+```python
+from x_client.integrations.mcp_adapter import XMCPAdapter
 
-# 動画付き（最大512MB、チャンクアップロード対応）
-python examples/create_post.py "Check out this video!" --video path/to/video.mp4
+adapter = XMCPAdapter()  # 認証情報は ConfigManager が自動読み込み
 
-# 別パスの .env を利用
-python examples/create_post.py "Hello with custom env" --dotenv /secure/path/.env
+post = adapter.create_post({"text": "Hello from MCP!"})
+print(post)
 
-# 長文スレッド投稿（chunk_limit=180 で自動分割）
-python examples/create_post.py "Long form update..." --thread --chunk-limit 180
-
-# ファイルからスレッドを投稿（UTF-8 テキストを想定）
-python examples/create_post.py --thread-file docs/thread_draft.txt
-
-# 日本語の長文スレッド例（280文字未満で適度に改行）
-python examples/create_post.py --thread-file examples/long_thread_ja.txt --chunk-limit 180
-
-# 英語の長文スレッド例（センテンス区切りを維持）
-python examples/create_post.py --thread-file examples/long_thread_en.txt --chunk-limit 240
-
-# レートリミット回避のため各投稿間で 8 秒待つ
-python examples/create_post.py --thread-file examples/long_thread_en.txt --segment-pause 8
-
-# 失敗したスレッドの先頭ツイートを削除（重複エラーの解消に利用）
-python examples/create_post.py --delete 1234567890123456789
-
-# リポスト / リポストの取り消し
-python examples/create_post.py --repost 1234567890
-python examples/create_post.py --undo-repost 1234567890
+media = adapter.upload_image({"path": "/path/to/image.png"})
+adapter.create_post({"text": "Image post", "media_ids": [media["media_id"]]})
 ```
 
-`examples/sample_image.png` をサンプル画像として同梱しているため、動作確認時には `--image examples/sample_image.png` を指定できます。
+### ロギングと可観測性
 
-スレッド投稿はテキストのみサポートしています（API 制約上メディア添付は不可）。`--chunk-limit` で 1 セグメントあたりの文字数上限を調整できます。`--thread-file` を指定すると Markdown/テキストファイルをそのままスレッドとして分割投稿します。
-
-### ロングスレッド投稿における言語別の考慮事項
-- **日本語**: 全角文字が多い場合は 280 文字ギリギリまで詰めると読みづらくなるため、`--chunk-limit` を 150-200 文字程度に抑えて文節ごとのまとまりを維持してください。また、句読点直後で分割されると文脈が途切れやすいので、テキストファイル側で段落ごとに空行を入れておくと安全です。UTF-8 のまま保存すれば X API で正しく扱われます。
-- **英語**: URL や絵文字を含むときは Twitter 側で 23 文字換算されるため、余裕を持って `--chunk-limit` を設定します。センテンス単位で改行しておくと、分割後も読みやすさが保たれます。また、引用符や Markdown 記法を使う場合は、変換後に 280 文字を超えていないか冒頭のドラフト投稿で必ず確認してください。
-
-スレッドを再投稿する場合、X 側の仕様で 24 時間以内に全く同じ本文を投稿すると **Duplicate content** エラーになります。前回投稿したスレッドを削除するか、テキストにタイムスタンプなどの一意な語句を追加してから再実行してください。`--delete` オプションで先頭ツイートを素早く削除できます。
-
-また、X API は短時間に連続で投稿すると HTTP 429 (Too Many Requests) を返すことがあります。本ライブラリでは `RateLimitExceeded` を検知するとレスポンスヘッダーの `x-rate-limit-reset` に従って待機してから再試行しますが、手動投稿でも同じ制限があるため、429 が発生した場合は 2～3 分ほど待ってからコマンドを再実行してください。
-`--segment-pause` を 5–10 秒程度に設定するとセグメントごとの投稿間隔に余裕を持たせられ、429 を事前に回避しやすくなります。
-
-リポスト操作は本文/メディア不要で、`--repost` で指定 ID をリポスト、`--undo-repost` で取り消します。
-
-## ロギングと可観測性
-
-`PostService` には構造化された INFO/DEBUG ログとイベントフックが標準で組み込まれています。`logging.basicConfig(level=logging.INFO)` を呼び出すだけで、スレッド投稿やリポストの進行状況が `post.thread.*` / `post.repost.*` といったイベント名で確認できます。
+`PostService` には構造化ログとイベントフックが組み込まれています：
 
 ```python
 import logging
-
 from x_client.config import ConfigManager
 from x_client.factory import XClientFactory
 from x_client.services.post_service import PostService
@@ -184,48 +338,13 @@ post_service = PostService(client, event_hook=metrics_hook)
 post_service.create_post("observability ready!")
 ```
 
-イベントフックは成功・失敗双方のイベントを単一コールバックへ集約するため、メトリクス送出や分散トレーシングとの連携が容易です。失敗時には `post.create.error` や `post.thread.error` が呼び出されるため、再試行戦略やアラート通知と組み合わせられます。
-
-## MCP (Model Context Protocol) で利用する
-
-このライブラリ（GitHub: `pyX-MCP`）は標準的な MCP サーバーとして AI アシスタント（Claude Desktop など）から利用できます。
-
-### 🚀 最も簡単な方法：uvx で実行（PyPI 公開後）
-
-**PyPI に公開済みであれば、以下のように使用できます**:
-
-```bash
-uvx --from pyx-mcp x-mcp-server
-```
-
-**Claude Desktop 設定例**:
-```json
-{
-  "mcpServers": {
-    "x-client": {
-      "command": "uvx",
-      "args": ["--from", "pyx-mcp", "x-mcp-server", "--stdio"],
-      "env": {
-        "X_API_KEY": "your-api-key",
-        "X_API_SECRET": "your-api-secret",
-        "X_ACCESS_TOKEN": "your-access-token",
-        "X_ACCESS_TOKEN_SECRET": "your-access-token-secret"
-      }
-    }
-  }
-}
-```
-
-**メリット**:
-- ✅ Node.js なしで利用可能（uv が自動で仮想環境を構築）
-- ✅ 依存関係は `uv` のキャッシュを利用して高速化
-- ✅ `--from` により常に最新リリースへ簡単に更新
+イベントフックは成功・失敗双方を単一コールバックへ集約するため、メトリクス送出や分散トレーシングとの連携が容易です。
 
 ---
 
-### 開発環境での利用
+## 開発環境での利用
 
-**1. セットアップ (初回のみ):**
+### セットアップ
 
 ```bash
 cd /path/to/twitter
@@ -234,11 +353,10 @@ uv pip install -e .
 
 これにより `x-mcp-server` コマンドが `.venv/bin/` に作成されます。
 
-**2. Claude Desktop の設定ファイルを編集:**
+### MCP サーバーをローカルパスで実行
 
-macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+開発中の MCP サーバーを直接実行する場合：
 
-**推奨: uvx エントリーポイント使用**
 ```json
 {
   "mcpServers": {
@@ -289,80 +407,76 @@ macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 ```
 </details>
 
-**重要**:
-- `/absolute/path/to/twitter` を実際のプロジェクトパスに置き換え
-- 認証情報を実際の X API 資格情報に置き換え
+**重要**: `/absolute/path/to/twitter` を実際のプロジェクトパスに置き換えてください。
 
-**2. Claude Desktop を再起動**
+---
 
-**3. 動作確認:**
+## CLI で利用する
 
-Claude に「利用可能な X API ツールを一覧表示して」と依頼すると、10個のツールが表示されます。
+`examples/create_post.py` を使うと、コマンドラインから簡単に投稿できます。
 
-### 使用例
+### 基本的な使い方
 
-```
-あなた: 「Hello from Claude via MCP!」と投稿して
+```bash
+# テキストのみ
+python examples/create_post.py "Hello from x_client!"
 
-Claude: create_post ツールを使用します...
-       投稿が完了しました！投稿ID: 1234567890
-```
+# 画像付き
+python examples/create_post.py "Check out this image!" --image path/to/image.png
 
-```
-あなた: 「MCP プロトコル」について最近の投稿を検索して
+# 動画付き（最大512MB、チャンクアップロード対応）
+python examples/create_post.py "Check out this video!" --video path/to/video.mp4
 
-Claude: search_recent_posts ツールを使用します...
-       3件の投稿が見つかりました:
-       1. @user1: MCP を使ってみた...
-       2. @user2: Model Context Protocol は...
+# 別パスの .env を利用
+python examples/create_post.py "Hello with custom env" --dotenv /secure/path/.env
 ```
 
-### Python API としても利用可能
+### スレッド投稿
 
-MCP クライアント以外からも直接呼び出せます:
+```bash
+# 長文スレッド投稿（chunk_limit=180 で自動分割）
+python examples/create_post.py "Long form update..." --thread --chunk-limit 180
 
-```python
-from x_client.integrations.mcp_adapter import XMCPAdapter
+# ファイルからスレッドを投稿（UTF-8 テキストを想定）
+python examples/create_post.py --thread-file docs/thread_draft.txt
 
-adapter = XMCPAdapter()  # 認証情報は ConfigManager が自動読み込み
+# 日本語の長文スレッド例（280文字未満で適度に改行）
+python examples/create_post.py --thread-file examples/long_thread_ja.txt --chunk-limit 180
 
-post = adapter.create_post({"text": "Hello from MCP!"})
-print(post)
+# 英語の長文スレッド例（センテンス区切りを維持）
+python examples/create_post.py --thread-file examples/long_thread_en.txt --chunk-limit 240
 
-media = adapter.upload_image({"path": "/path/to/image.png"})
-adapter.create_post({"text": "Image post", "media_ids": [media["media_id"]]})
+# レートリミット回避のため各投稿間で 8 秒待つ
+python examples/create_post.py --thread-file examples/long_thread_en.txt --segment-pause 8
 ```
 
-### アーキテクチャ
+### その他の操作
 
+```bash
+# 失敗したスレッドの先頭ツイートを削除（重複エラーの解消に利用）
+python examples/create_post.py --delete 1234567890123456789
+
+# リポスト / リポストの取り消し
+python examples/create_post.py --repost 1234567890
+python examples/create_post.py --undo-repost 1234567890
 ```
-Claude Desktop ↔ MCP Server (stdio) ↔ XMCPAdapter ↔ Service Layer ↔ X API
-```
 
-### 提供ツール
+### 言語別の考慮事項
 
-- `create_post`, `delete_post`, `get_post`, `search_recent_posts`
-- `create_thread`, `repost_post`, `undo_repost`
-- `upload_image`（画像: JPEG/PNG/WebP/GIF, 最大 5MB）
-- `upload_video`（動画: MP4, 最大 512MB, チャンクアップロード対応）
-- `get_auth_status`（OAuth1 アクセストークンから `user_id` を抽出し、利用可能であればレート制限情報 `{limit, remaining, reset_at}` を返却）
+- **日本語**: 全角文字が多い場合は 280 文字ギリギリまで詰めると読みづらくなるため、`--chunk-limit` を 150-200 文字程度に抑えて文節ごとのまとまりを維持してください。また、句読点直後で分割されると文脈が途切れやすいので、テキストファイル側で段落ごとに空行を入れておくと安全です。
 
-### エラーハンドリング
-- `ConfigurationError`: 認証情報不足。`.env` と環境変数を確認。
-- `AuthenticationError`: トークン失効。OAuth フローを再実行。
-- `RateLimitExceeded`: レート制限到達。`reset_at` を参照し、バックオフを実施。
-- `MediaProcessingTimeout` / `MediaProcessingFailed`: 動画処理が完了しない場合。`timeout` や動画品質を調整。
+- **英語**: URL や絵文字を含むときは Twitter 側で 23 文字換算されるため、余裕を持って `--chunk-limit` を設定します。センテンス単位で改行しておくと、分割後も読みやすさが保たれます。
 
-### トラブルシューティング
-- **Missing credentials**: `echo $X_API_KEY` などで環境変数を確認し、`.env` が 0o600 で保存されているか確認する。
-- **Invalid token**: `python examples/create_post.py "test"` を実行して OAuth フローを復旧。
-- **Video timeout**: `upload_video` の `timeout` を延長するか、`ffmpeg` で再エンコードする。
+### 注意事項
 
-### 詳細ドキュメント
+- スレッドを再投稿する場合、X 側の仕様で 24 時間以内に全く同じ本文を投稿すると **Duplicate content** エラーになります。前回投稿したスレッドを削除するか、テキストにタイムスタンプなどの一意な語句を追加してください。
 
-MCP サーバーの詳細な設定とトラブルシューティングは [docs/mcp_setup.md](docs/mcp_setup.md) を参照してください。
+- X API は短時間に連続で投稿すると HTTP 429 (Too Many Requests) を返すことがあります。本ライブラリでは `RateLimitExceeded` を検知するとレスポンスヘッダーの `x-rate-limit-reset` に従って待機してから再試行しますが、429 が発生した場合は 2～3 分ほど待ってからコマンドを再実行してください。`--segment-pause` を 5–10 秒程度に設定すると 429 を事前に回避しやすくなります。
 
-### テスト
+
+---
+
+## テスト
 
 ```bash
 # MCP サーバーの動作テスト
@@ -370,14 +484,7 @@ uv run python scripts/test_mcp_server.py
 
 # ユニットテスト
 uv run pytest tests/unit/test_mcp_adapter.py -v
-```
 
-## ドキュメント
-
-詳細な設計・計画や既知の懸念点は `docs/x_api_design.md` を参照してください（プロジェクト内ドキュメントはこの1ファイルに統合されています）。
-
-## テスト実行
-```bash
 # 全テスト実行
 uv run pytest
 
@@ -391,5 +498,22 @@ uv run pytest -v
 uv run pytest tests/unit/test_tweepy_client.py
 ```
 
+---
+
+## 主な機能
+
+- デュアルクライアント構成：投稿は tweepy.Client (v2)、メディアは tweepy.API (v1.1)
+- `.env` を用いた安全な認証情報管理と OAuth フロー統合
+- `PostService` / `MediaService` による高レベル API
+- 長文スレッド投稿ユーティリティと自動リプライチェーン構築
+- リポスト／取り消し API と MCP ツール
+- 検索 API の expansions／fields 指定対応と著者情報解決
+- サービス層に組み込まれた構造化ログとイベントフック
+- MCP (Model Context Protocol) 統合による AI アシスタントからの操作
+
+
+---
+
 ## サポート
+
 バグ報告や改善提案は issue もしくは pull request でお知らせください。プロジェクト方針や設計に関する詳細は `docs/` を参照のうえ、必要に応じてコメントを追加してください。
