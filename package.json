@@ -1,6 +1,6 @@
 {
   "name": "@hello-cybernetics/x-mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "X (Twitter) API MCP Server",
   "bin": {
     "x-mcp-server": "bin/x-mcp-server.js"
