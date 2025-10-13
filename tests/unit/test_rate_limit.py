@@ -290,8 +290,37 @@ def test_rate_limit_handler_execute_with_retry_rate_limit():
     assert result == "success"
     assert mock_operation.call_count == 2
 
-    # Should have slept for backoff
-    assert mock_sleep.call_count >= 1  # At least the backoff delay
+    # Should have applied exponential backoff (not full reset wait)
+    assert mock_sleep.call_count == 1
+    wait_time = mock_sleep.call_args[0][0]
+    assert wait_time == pytest.approx(config.calculate_delay(0))
+
+
+def test_rate_limit_handler_clears_cached_limit_after_wait():
+    """Ensure cached rate limit is cleared so subsequent calls don't stall."""
+    config = RetryConfig(max_retries=1, base_delay=0.1, jitter=False)
+    handler = RateLimitHandler(retry_config=config)
+    mock_sleep = Mock()
+    handler.sleep = mock_sleep
+
+    now = datetime.now(timezone.utc).timestamp()
+    future_reset = int(now + 1)
+
+    mock_operation = Mock(
+        side_effect=[
+            RateLimitExceeded("Rate limit", reset_at=future_reset),
+            ("success", {}),  # empty headers mimic tweepy v2 behaviour
+        ]
+    )
+
+    result = handler.execute_with_retry(mock_operation)
+
+    assert result == "success"
+    assert mock_operation.call_count == 2
+    assert mock_sleep.call_count == 1
+
+    info = handler.get_rate_limit_info()
+    assert info is None or not info.is_exhausted()
 
 
 def test_rate_limit_handler_execute_with_retry_max_retries():

@@ -185,27 +185,18 @@ class RateLimitHandler:
                 last_exception = e
 
                 # Update rate limit if available in exception
-                waited_for_reset = False
                 if isinstance(e, RateLimitExceeded):
                     if e.reset_at:
                         if self._last_rate_limit:
                             self._last_rate_limit.reset_at = e.reset_at
-                            self._last_rate_limit.remaining = 0
+                            self._last_rate_limit.remaining = None
                         else:
                             self._last_rate_limit = RateLimitInfo(
-                                remaining=0,
+                                remaining=None,
                                 reset_at=e.reset_at,
                             )
-                        try:
-                            self.wait_if_needed()
-                            waited_for_reset = True
-                        except RateLimitExceeded:
-                            # Unknown reset time even after update -> fall back to backoff
-                            pass
                     elif self._last_rate_limit is None:
-                        # Without reset info we still want to mark exhaustion so future
-                        # wait_if_needed calls can trigger default handling when headers arrive.
-                        self._last_rate_limit = RateLimitInfo(remaining=0)
+                        self._last_rate_limit = RateLimitInfo()
 
                 # Check if we should retry
                 if not should_retry(e):
@@ -214,10 +205,6 @@ class RateLimitHandler:
                 # Don't retry on last attempt
                 if attempt >= self.retry_config.max_retries:
                     raise
-
-                if waited_for_reset:
-                    # We've already slept until reset; immediately retry.
-                    continue
 
                 # Calculate and apply backoff when reset info unavailable
                 delay = self.retry_config.calculate_delay(attempt)

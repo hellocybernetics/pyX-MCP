@@ -1,0 +1,35 @@
+{
+  "name": "@your-org/x-mcp-server",
+  "version": "0.1.0",
+  "description": "X (Twitter) API MCP Server",
+  "bin": {
+    "x-mcp-server": "./bin/x-mcp-server.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install-python.js"
+  },
+  "keywords": [
+    "mcp",
+    "twitter",
+    "x",
+    "api",
+    "claude"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/x-mcp-server"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "x_client/",
+    "pyproject.toml",
+    "uv.lock",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -7,7 +7,14 @@ requires-python = ">=3.13"
 dependencies = [
     "tweepy>=4.16.0",
     "pydantic>=2.8.0",
+    "mcp>=1.17.0",
 ]
+
+[project.scripts]
+x-mcp-server = "x_client.integrations.mcp_server:main"
+
+[tool.setuptools]
+packages = ["x_client"]
 
 [tool.uv]
 dev-dependencies = [

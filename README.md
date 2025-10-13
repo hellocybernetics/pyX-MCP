@@ -188,19 +188,139 @@ post_service.create_post("observability ready!")
 
 ## MCP (Model Context Protocol) で利用する
 
-このライブラリは MCP サーバーとして AI アシスタント（Claude など）から利用できます。サービス層を再利用したアダプタにより、自然言語から投稿やメディアアップロードを行えます。
+このライブラリは標準的な MCP サーバーとして AI アシスタント（Claude Desktop など）から利用できます。
 
-### セットアップ
-1. `.env` または環境変数に X (Twitter) API 資格情報を設定する（`X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` など）。
-2. `from x_client.integrations.mcp_adapter import XMCPAdapter` をインポートし、`adapter = XMCPAdapter()` で初期化する。
-3. MCP ホストにツール定義を登録し、AI アシスタントから呼び出せるようにする。`adapter.get_tool_schemas()` で各ツールの JSON Schema を取得可能。
+### 🚀 最も簡単な方法：npx で実行（NPM公開後）
 
-アーキテクチャ構成：
-```
-AI Assistant ↔ MCP ↔ XMCPAdapter ↔ Service Layer ↔ TweepyClient ↔ X API
+**NPM に公開後、以下のように使用できます**:
+
+```bash
+npx @your-org/x-mcp-server
 ```
 
-### 代表的な呼び出し例
+**Claude Desktop 設定**:
+```json
+{
+  "mcpServers": {
+    "x-client": {
+      "command": "npx",
+      "args": ["@your-org/x-mcp-server"],
+      "env": {
+        "X_API_KEY": "your-api-key",
+        "X_API_SECRET": "your-api-secret",
+        "X_ACCESS_TOKEN": "your-access-token",
+        "X_ACCESS_TOKEN_SECRET": "your-access-token-secret"
+      }
+    }
+  }
+}
+```
+
+**メリット**:
+- ✅ ソースコードの場所を指定不要
+- ✅ 自動セットアップ（初回のみ 30-60秒）
+- ✅ キャッシュによる高速起動（2回目以降 1-2秒）
+- ✅ 自動アップデート対応
+
+---
+
+### 開発環境での利用
+
+**1. セットアップ (初回のみ):**
+
+```bash
+cd /path/to/twitter
+uv pip install -e .
+```
+
+これにより `x-mcp-server` コマンドが `.venv/bin/` に作成されます。
+
+**2. Claude Desktop の設定ファイルを編集:**
+
+macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+**推奨: エントリーポイント使用 (npx スタイル)**
+```json
+{
+  "mcpServers": {
+    "x-client": {
+      "command": "/absolute/path/to/twitter/.venv/bin/x-mcp-server",
+      "env": {
+        "X_API_KEY": "your-api-key",
+        "X_API_SECRET": "your-api-secret",
+        "X_ACCESS_TOKEN": "your-access-token",
+        "X_ACCESS_TOKEN_SECRET": "your-access-token-secret"
+      }
+    }
+  }
+}
+```
+
+<details>
+<summary>代替方法 (クリックして展開)</summary>
+
+**方法2: uv 直接使用**
+```json
+{
+  "mcpServers": {
+    "x-client": {
+      "command": "uv",
+      "args": ["run", "--directory", "/absolute/path/to/twitter", "python", "-m", "x_client.integrations.mcp_server"],
+      "env": {
+        "X_API_KEY": "your-api-key",
+        "X_API_SECRET": "your-api-secret",
+        "X_ACCESS_TOKEN": "your-access-token",
+        "X_ACCESS_TOKEN_SECRET": "your-access-token-secret"
+      }
+    }
+  }
+}
+```
+
+**方法3: ランチャースクリプト**
+```json
+{
+  "mcpServers": {
+    "x-client": {
+      "command": "/absolute/path/to/twitter/scripts/run_mcp_server.sh",
+      "env": { "X_API_KEY": "...", "X_API_SECRET": "...", "X_ACCESS_TOKEN": "...", "X_ACCESS_TOKEN_SECRET": "..." }
+    }
+  }
+}
+```
+</details>
+
+**重要**:
+- `/absolute/path/to/twitter` を実際のプロジェクトパスに置き換え
+- 認証情報を実際の X API 資格情報に置き換え
+
+**2. Claude Desktop を再起動**
+
+**3. 動作確認:**
+
+Claude に「利用可能な X API ツールを一覧表示して」と依頼すると、10個のツールが表示されます。
+
+### 使用例
+
+```
+あなた: 「Hello from Claude via MCP!」と投稿して
+
+Claude: create_post ツールを使用します...
+       投稿が完了しました！投稿ID: 1234567890
+```
+
+```
+あなた: 「MCP プロトコル」について最近の投稿を検索して
+
+Claude: search_recent_posts ツールを使用します...
+       3件の投稿が見つかりました:
+       1. @user1: MCP を使ってみた...
+       2. @user2: Model Context Protocol は...
+```
+
+### Python API としても利用可能
+
+MCP クライアント以外からも直接呼び出せます:
 
 ```python
 from x_client.integrations.mcp_adapter import XMCPAdapter
@@ -212,6 +332,12 @@ print(post)
 
 media = adapter.upload_image({"path": "/path/to/image.png"})
 adapter.create_post({"text": "Image post", "media_ids": [media["media_id"]]})
+```
+
+### アーキテクチャ
+
+```
+Claude Desktop ↔ MCP Server (stdio) ↔ XMCPAdapter ↔ Service Layer ↔ X API
 ```
 
 ### 提供ツール
@@ -233,10 +359,18 @@ adapter.create_post({"text": "Image post", "media_ids": [media["media_id"]]})
 - **Invalid token**: `python examples/create_post.py "test"` を実行して OAuth フローを復旧。
 - **Video timeout**: `upload_video` の `timeout` を延長するか、`ffmpeg` で再エンコードする。
 
+### 詳細ドキュメント
+
+MCP サーバーの詳細な設定とトラブルシューティングは [docs/mcp_setup.md](docs/mcp_setup.md) を参照してください。
+
 ### テスト
+
 ```bash
+# MCP サーバーの動作テスト
+uv run python scripts/test_mcp_server.py
+
+# ユニットテスト
 uv run pytest tests/unit/test_mcp_adapter.py -v
-uv run pytest tests/integration/test_mcp_workflow.py -v
 ```
 
 ## ドキュメント
