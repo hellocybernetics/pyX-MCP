@@ -60,7 +60,8 @@ AI アシスタント（Claude Code、Claude Desktop、codex-cli、Gemini など
 
 各 AI ツールの MCP 設定ファイルに以下を記述します：
 
-**TOML 形式**:
+**TOML 形式 (Codex-CLIなど)**:
+* PyPI公開版
 ```toml
 [mcp.servers.x_client]
 command = "uvx"
@@ -73,13 +74,45 @@ X_ACCESS_TOKEN = "your-access-token"
 X_ACCESS_TOKEN_SECRET = "your-access-token-secret"
 ```
 
-**JSON 形式**:
+* github最新版
+```toml
+[mcp.servers.x_client]
+command = "uvx"
+args = ["--from", "git+https://github.com/hellocybernetics/pyX-MCP", "x-mcp-server"]
+
+[mcp.servers.x_client.env]
+X_API_KEY = "your-api-key"
+X_API_SECRET = "your-api-secret"
+X_ACCESS_TOKEN = "your-access-token"
+X_ACCESS_TOKEN_SECRET = "your-access-token-secret"
+```
+
+
+**JSON 形式（Claude Code, Gemini CLI など）**:
+* PyPI公開版
 ```json
 {
   "mcpServers": {
     "x_client": {
       "command": "uvx",
       "args": ["--from", "pyx-mcp", "x-mcp-server"],
+      "env": {
+        "X_API_KEY": "your-api-key",
+        "X_API_SECRET": "your-api-secret",
+        "X_ACCESS_TOKEN": "your-access-token",
+        "X_ACCESS_TOKEN_SECRET": "your-access-token-secret"
+      }
+    }
+  }
+}
+```
+* github最新版
+```json
+{
+  "mcpServers": {
+    "x_client": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/hellocybernetics/pyX-MCP", "x-mcp-server"],
       "env": {
         "X_API_KEY": "your-api-key",
         "X_API_SECRET": "your-api-secret",
