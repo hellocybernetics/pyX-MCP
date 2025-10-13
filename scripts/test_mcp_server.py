@@ -40,7 +40,7 @@ async def send_jsonrpc_request(process: subprocess.Popen, request: dict) -> dict
     return json.loads(response_line)
 
 
-async def test_mcp_server():
+async def _run_mcp_server_test():
     """Test the MCP server with various requests."""
     print("=" * 80)
     print("X MCP Server Test Suite")
@@ -143,5 +143,10 @@ async def test_mcp_server():
             process.kill()
 
 
+def test_mcp_server():
+    """Pytest entry point that executes the async test logic."""
+    asyncio.run(_run_mcp_server_test())
+
+
 if __name__ == "__main__":
-    asyncio.run(test_mcp_server())
+    asyncio.run(_run_mcp_server_test())

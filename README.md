@@ -188,23 +188,23 @@ post_service.create_post("observability ready!")
 
 ## MCP (Model Context Protocol) で利用する
 
-このライブラリは標準的な MCP サーバーとして AI アシスタント（Claude Desktop など）から利用できます。
+このライブラリ（GitHub: `pyX-MCP`）は標準的な MCP サーバーとして AI アシスタント（Claude Desktop など）から利用できます。
 
-### 🚀 最も簡単な方法：npx で実行（NPM公開後）
+### 🚀 最も簡単な方法：uvx で実行（PyPI 公開後）
 
-**NPM に公開後、以下のように使用できます**:
+**PyPI に公開済みであれば、以下のように使用できます**:
 
 ```bash
-npx @your-org/x-mcp-server
+uvx --from pyx-mcp x-mcp-server
 ```
 
-**Claude Desktop 設定**:
+**Claude Desktop 設定例**:
 ```json
 {
   "mcpServers": {
     "x-client": {
-      "command": "npx",
-      "args": ["-y", "@hello-cybernetics/x-mcp-server", "--stdio"],
+      "command": "uvx",
+      "args": ["--from", "pyx-mcp", "x-mcp-server", "--stdio"],
       "env": {
         "X_API_KEY": "your-api-key",
         "X_API_SECRET": "your-api-secret",
@@ -217,10 +217,9 @@ npx @your-org/x-mcp-server
 ```
 
 **メリット**:
-- ✅ ソースコードの場所を指定不要
-- ✅ 自動セットアップ（初回のみ 30-60秒）
-- ✅ キャッシュによる高速起動（2回目以降 1-2秒）
-- ✅ 自動アップデート対応
+- ✅ Node.js なしで利用可能（uv が自動で仮想環境を構築）
+- ✅ 依存関係は `uv` のキャッシュを利用して高速化
+- ✅ `--from` により常に最新リリースへ簡単に更新
 
 ---
 
@@ -239,7 +238,7 @@ uv pip install -e .
 
 macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
-**推奨: エントリーポイント使用 (npx スタイル)**
+**推奨: uvx エントリーポイント使用**
 ```json
 {
   "mcpServers": {

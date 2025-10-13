@@ -21,17 +21,51 @@ The X MCP Server requires X API credentials to be provided as environment variab
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Linux**: `~/.config/claude/claude_desktop_config.json`
 
-### Configuration Method 1: Using Entry Point (推奨 - npx スタイル)
+### Configuration Method 1: Using uvx (推奨)
 
-パッケージのエントリーポイントを使用する、最もクリーンな方法です。
+PyPI に公開された `pyx-mcp` パッケージを `uvx` で直接呼び出す方法です。
 
-**前提条件**: プロジェクトディレクトリで一度だけ実行:
+```json
+{
+  "mcpServers": {
+    "x-client": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "pyx-mcp",
+        "x-mcp-server",
+        "--stdio"
+      ],
+      "env": {
+        "X_API_KEY": "your-api-key-here",
+        "X_API_SECRET": "your-api-secret-here",
+        "X_ACCESS_TOKEN": "your-access-token-here",
+        "X_ACCESS_TOKEN_SECRET": "your-access-token-secret-here"
+      }
+    }
+  }
+}
+```
+
+**メリット**:
+- ✅ Node.js なしで利用可能
+- ✅ 依存関係を自動的に解決し、`uv` キャッシュで高速化
+- ✅ `--from` により最新版へ容易に追従
+
+**仕組み**:
+- `uvx` が一時仮想環境を作成し `x-mcp-server` スクリプトを実行
+- PyPI 上の `pyx-mcp` パッケージを取得
+- 依存関係は `uv` のロック情報に従って解決
+
+### Configuration Method 2: Using Entry Point from Local Editable Install
+
+開発用にローカルで編集可能インストール (`uv pip install -e .`) した環境を利用する方法です。
+
 ```bash
 cd /path/to/twitter
 uv pip install -e .
 ```
 
-**Claude Desktop 設定**:
 ```json
 {
   "mcpServers": {
@@ -49,17 +83,16 @@ uv pip install -e .
 ```
 
 **メリット**:
-- ✅ `npx` スタイルのシンプルな呼び出し
-- ✅ パッケージの標準的な配布方法
-- ✅ コマンド名が明確 (`x-mcp-server`)
-- ✅ 依存関係が自動解決
+- ✅ エントリーポイントが `.venv` に配置され即座に使用可能
+- ✅ ローカル開発と本番ツールを同一コマンドで検証できる
+- ✅ 依存関係は `uv` が管理
 
 **仕組み**:
-- `pyproject.toml` の `[project.scripts]` でエントリーポイント定義
-- `uv pip install -e .` で `.venv/bin/x-mcp-server` スクリプトが生成
-- スクリプトは自動的にプロジェクトの `.venv` を使用
+- `pyproject.toml` の `[project.scripts]` 定義から `x-mcp-server` が生成
+- `.venv` 配下にスクリプトが作成され、仮想環境を自動アクティベート
+- MCP クライアントからはローカルパスを指定
 
-### Configuration Method 2: Using Launcher Script
+### Configuration Method 3: Using Launcher Script
 
 シェルスクリプトを使用する方法です。
 
@@ -84,7 +117,7 @@ uv pip install -e .
 - ✅ 自動的に正しいディレクトリに移動
 - ✅ カスタマイズ可能
 
-### Configuration Method 3: Using uv directly
+### Configuration Method 4: Using uv directly
 
 `uv` コマンドを直接使用する方法です。
 
@@ -120,7 +153,7 @@ uv pip install -e .
 - Replace `/absolute/path/to/twitter` with the actual absolute path to your project directory
 - Replace the credential values with your actual X API credentials
 - **Never commit this file to version control** - it contains sensitive credentials
-- Both methods work correctly, but Method 1 (launcher script) is more robust
+- いずれの方法でも動作しますが、ローカル環境では Method 3 (Launcher Script) がより堅牢です
 
 ### Alternative: Using .env File (More Secure)
 

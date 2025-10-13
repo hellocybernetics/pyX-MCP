@@ -1,5 +1,5 @@
 [project]
-name = "x"
+name = "pyx-mcp"
 version = "0.1.0"
 description = "X (Twitter) API client library with tweepy and pydantic"
 readme = "README.md"
@@ -17,6 +17,7 @@ x-mcp-server = "x_client.integrations.mcp_server:main"
 packages = ["x_client"]
 
 [tool.uv]
+package = true
 dev-dependencies = [
     "pytest>=8.3.0",
     "pytest-cov>=5.0.0",
