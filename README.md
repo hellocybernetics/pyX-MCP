@@ -44,7 +44,7 @@ In other words, this library has two faces:
 It is also possible to use the X API as a library without MCP (see bottom of README.md).
 
 ## Requirements
-- Python 3.13 or higher
+- Python 3.11 or higher
 - X (Twitter) developer account and a set of API keys
 - Package management tool [uv](https://docs.astral.sh/uv/) (recommended)
 
@@ -305,7 +305,7 @@ post = post_service.create_post(
 
 # 5. Post a long thread
 thread = post_service.create_thread(
-    '''Python 3.13 highlights... (long text)''',
+    '''Python 3.11 highlights... (long text)''',
     chunk_limit=200,
 )
 for idx, segment_post in enumerate(thread.posts, start=1):

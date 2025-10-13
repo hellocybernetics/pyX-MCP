@@ -44,7 +44,7 @@ graph TD
 という二つの顔を持っています。MCPではなく、X APIをライブラリとして利用することも可能です。（README.md下部）
 
 ## 必要条件
-- Python 3.13 以上
+- Python 3.11 以上
 - X (Twitter) 開発者アカウントと API キー一式
 - パッケージ管理ツール [uv](https://docs.astral.sh/uv/)（推奨）
 
@@ -306,7 +306,7 @@ post = post_service.create_post(
 
 # 5. 長文スレッド投稿
 thread = post_service.create_thread(
-    """Python 3.13 highlights... (long text)""",
+    """Python 3.11 highlights... (long text)""",
     chunk_limit=200,
 )
 for idx, segment_post in enumerate(thread.posts, start=1):
