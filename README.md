@@ -204,7 +204,7 @@ npx @your-org/x-mcp-server
   "mcpServers": {
     "x-client": {
       "command": "npx",
-      "args": ["@your-org/x-mcp-server"],
+      "args": ["@hello-cybernetics/x-mcp-server"],
       "env": {
         "X_API_KEY": "your-api-key",
         "X_API_SECRET": "your-api-secret",
