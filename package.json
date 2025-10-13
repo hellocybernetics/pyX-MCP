@@ -23,6 +23,7 @@
   },
   "files": [
     "bin/",
+    "lib/",
     "scripts/",
     "x_client/",
     "pyproject.toml",
