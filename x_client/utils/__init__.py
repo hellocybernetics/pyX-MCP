@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-__all__ = ["split_text_for_thread"]
+__all__ = [
+    "split_text_for_thread",
+    "TextSplitStrategy",
+    "get_split_strategy",
+]
 
-from .text import split_text_for_thread
-
+from .text import split_text_for_thread, TextSplitStrategy, get_split_strategy

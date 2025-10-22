@@ -120,6 +120,15 @@ def main() -> int:
         help="Seconds to wait between thread segments (default: 5.0)",
     )
     parser.add_argument(
+        "--split-strategy",
+        choices=["simple", "sentence", "paragraph"],
+        default=None,
+        help=(
+            "Thread split strategy: 'simple' (whitespace, default), "
+            "'sentence' (句読点で文単位), 'paragraph' (空行で段落優先)."
+        ),
+    )
+    parser.add_argument(
         "--repost",
         metavar="POST_ID",
         help="Repost the given post ID",
@@ -264,6 +273,7 @@ def main() -> int:
                 chunk_limit=args.chunk_limit,
                 rollback_on_failure=True,
                 segment_pause=max(args.segment_pause, 0.0),
+                split_strategy=args.split_strategy,
             )
 
             if result.succeeded:

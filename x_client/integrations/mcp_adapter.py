@@ -130,12 +130,18 @@ class XMCPAdapter:
         try:
             validated = CreateThreadRequest.model_validate(request)
 
-            result = self.post_service.create_thread(
+            # Only pass split_strategy if provided to avoid breaking tests that
+            # assert exact call kwargs.
+            create_kwargs: dict[str, Any] = dict(
                 text=validated.text,
                 chunk_limit=validated.chunk_limit,
                 in_reply_to=validated.in_reply_to,
                 rollback_on_failure=validated.rollback_on_failure,
             )
+            if getattr(validated, "split_strategy", None) is not None:
+                create_kwargs["split_strategy"] = validated.split_strategy
+
+            result = self.post_service.create_thread(**create_kwargs)
 
             post_responses = [self._serialize_post(post) for post in result.posts]
             error = result.error

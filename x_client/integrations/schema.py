@@ -59,6 +59,13 @@ class CreateThreadRequest(BaseModel):
         True,
         description="Whether to delete previously created posts if a later segment fails",
     )
+    split_strategy: Literal["simple", "sentence", "paragraph"] | None = Field(
+        None,
+        description=(
+            "Optional split strategy. 'simple' (default) splits by whitespace; "
+            "'sentence' keeps sentences together; 'paragraph' respects blank lines."
+        ),
+    )
 
 
 class AuthorResponse(BaseModel):

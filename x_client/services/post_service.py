@@ -11,7 +11,7 @@ from typing import Any, Callable, Iterable, Protocol, Sequence
 
 from x_client.exceptions import ApiResponseError, ThreadCreationError, XClientError
 from x_client.models import Post, PostDeleteResult, RepostResult
-from x_client.utils import split_text_for_thread
+from x_client.utils import split_text_for_thread, TextSplitStrategy
 
 
 EventHook = Callable[[str, dict[str, Any]], None]
@@ -217,6 +217,7 @@ class PostService:
         in_reply_to: str | None = None,
         rollback_on_failure: bool = True,
         segment_pause: float = 0.0,
+        split_strategy: str | TextSplitStrategy | None = None,
         **extra: Any,
     ) -> ThreadCreateResult:
         """Create a thread by splitting text and chaining replies.
@@ -235,7 +236,9 @@ class PostService:
             ThreadCreateResult describing the outcome.
         """
 
-        segments = self._normalize_thread_segments(text, chunk_limit=chunk_limit)
+        segments = self._normalize_thread_segments(
+            text, chunk_limit=chunk_limit, split_strategy=split_strategy
+        )
         self.logger.info(
             "post.thread.start",
             extra={
@@ -345,10 +348,16 @@ class PostService:
     # Internal helpers -------------------------------------------------
 
     def _normalize_thread_segments(
-        self, text: str | Iterable[str], *, chunk_limit: int
+        self,
+        text: str | Iterable[str],
+        *,
+        chunk_limit: int,
+        split_strategy: str | TextSplitStrategy | None = None,
     ) -> list[str]:
         if isinstance(text, str):
-            segments = split_text_for_thread(text, limit=chunk_limit)
+            segments = split_text_for_thread(
+                text, limit=chunk_limit, strategy=split_strategy
+            )
         else:
             segments = [segment.strip() for segment in text if segment is not None]
 
