@@ -54,3 +54,6 @@ Thumbs.db
 
 # binary
 *.tgz
+
+# code analyze
+.pyscn
