@@ -9,7 +9,7 @@ optionally accept a strategy name or object.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 
@@ -77,7 +77,7 @@ class SentenceBoundaryStrategy:
     word-boundary hard wrap within that sentence.
     """
 
-    _word_strategy: WordBoundaryStrategy = WordBoundaryStrategy()
+    _word_strategy: WordBoundaryStrategy = field(default_factory=WordBoundaryStrategy)
 
     _sentence_re = re.compile(
         r"""
@@ -147,7 +147,7 @@ class ParagraphStrategy:
     paragraph is further split using the word-boundary strategy.
     """
 
-    _word_strategy: WordBoundaryStrategy = WordBoundaryStrategy()
+    _word_strategy: WordBoundaryStrategy = field(default_factory=WordBoundaryStrategy)
 
     def split(self, text: str, *, limit: int) -> list[str]:
         if limit <= 0:

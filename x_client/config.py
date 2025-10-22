@@ -5,9 +5,11 @@ Configuration management utilities for x_client.
 from __future__ import annotations
 
 import os
-from dataclasses import asdict, dataclass
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Protocol, Sequence
+from typing import Protocol
+
+from pydantic import BaseModel
 
 from x_client.exceptions import ConfigurationError
 
@@ -23,15 +25,14 @@ ENV_VAR_MAP = {
 class CredentialsProvider(Protocol):
     """Abstract provider used to decouple persistence from runtime usage."""
 
-    def load(self) -> "XCredentials":
+    def load(self) -> XCredentials:
         raise NotImplementedError
 
-    def save(self, credentials: "XCredentials") -> None:
+    def save(self, credentials: XCredentials) -> None:
         raise NotImplementedError
 
 
-@dataclass(slots=True)
-class XCredentials:
+class XCredentials(BaseModel):
     """Credential container supporting OAuth 1.0a and OAuth 2.0 tokens."""
 
     api_key: str | None = None
@@ -52,7 +53,7 @@ class XCredentials:
             )
         )
 
-    def merge(self, other: "XCredentials") -> "XCredentials":
+    def merge(self, other: XCredentials) -> XCredentials:
         """Merge credential sets, preferring non-null values from ``other``."""
 
         return XCredentials(
@@ -66,12 +67,12 @@ class XCredentials:
     def to_dict(self) -> dict[str, str]:
         return {
             key: value
-            for key, value in asdict(self).items()
+            for key, value in self.model_dump().items()
             if isinstance(value, str) and value
         }
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, str | None]) -> "XCredentials":
+    def from_mapping(cls, data: Mapping[str, str | None]) -> XCredentials:
         return cls(
             api_key=data.get("api_key"),
             api_secret=data.get("api_secret"),

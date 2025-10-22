@@ -4,8 +4,9 @@ Pydantic models for X (Twitter) API responses used by x_client.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -20,7 +21,7 @@ class User(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @classmethod
-    def from_api(cls, payload: Any) -> "User":
+    def from_api(cls, payload: Any) -> User:
         return cls.model_validate(_to_mapping(payload))
 
 
@@ -78,7 +79,7 @@ class Post(BaseModel):
         payload: Any,
         *,
         includes: Mapping[str, Any] | None = None,
-    ) -> "Post":
+    ) -> Post:
         mapping = dict(_to_mapping(payload))
 
         author_id = mapping.get("author_id")
@@ -96,7 +97,7 @@ class PostDeleteResult(BaseModel):
     deleted: bool
 
     @classmethod
-    def from_api(cls, payload: Any) -> "PostDeleteResult":
+    def from_api(cls, payload: Any) -> PostDeleteResult:
         return cls.model_validate(_to_mapping(payload))
 
 
@@ -108,7 +109,7 @@ class RepostResult(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @classmethod
-    def from_api(cls, payload: Any) -> "RepostResult":
+    def from_api(cls, payload: Any) -> RepostResult:
         mapping = _to_mapping(payload)
         if "reposted" in mapping:
             value = mapping["reposted"]
@@ -152,7 +153,7 @@ class MediaUploadResult(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     @classmethod
-    def from_api(cls, payload: Any) -> "MediaUploadResult":
+    def from_api(cls, payload: Any) -> MediaUploadResult:
         return cls.model_validate(_to_mapping(payload))
 
     @field_validator("media_id", mode="before")

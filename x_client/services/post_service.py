@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Protocol, Sequence
+from typing import Any, Protocol
 
 from x_client.exceptions import ApiResponseError, ThreadCreationError, XClientError
 from x_client.models import Post, PostDeleteResult, RepostResult

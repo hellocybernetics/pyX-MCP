@@ -4,10 +4,11 @@ Authentication helpers for OAuth workflows.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 import tweepy
+from pydantic import BaseModel
 
 from x_client.config import ConfigManager, XCredentials
 from x_client.exceptions import AuthenticationError, ConfigurationError
@@ -20,8 +21,7 @@ class OAuthCallback(Protocol):
         ...
 
 
-@dataclass(slots=True)
-class OAuthTokens:
+class OAuthTokens(BaseModel):
     """Container for OAuth access tokens."""
 
     access_token: str

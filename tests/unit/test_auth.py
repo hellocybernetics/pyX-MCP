@@ -36,7 +36,7 @@ def test_ensure_oauth1_token_returns_cached_tokens(tmp_path) -> None:
     oauth = OAuthManager(manager)
 
     tokens = oauth.ensure_oauth1_token()
-    assert tokens == OAuthTokens("cached-access", "cached-secret")
+    assert tokens == OAuthTokens(access_token="cached-access", access_token_secret="cached-secret")
 
 
 def test_start_oauth1_flow_persists_tokens(tmp_path) -> None:

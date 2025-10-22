@@ -10,17 +10,19 @@ from __future__ import annotations
 import logging
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from x_client.exceptions import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass(slots=True)
-class RateLimitInfo:
+class RateLimitInfo(BaseModel):
     """Rate limit information from API response headers."""
 
     limit: int | None = None  # Total request limit
@@ -63,8 +65,7 @@ class RateLimitInfo:
         return max(0.0, self.reset_at - now)
 
 
-@dataclass(slots=True)
-class RetryConfig:
+class RetryConfig(BaseModel):
     """Configuration for retry behavior with exponential backoff."""
 
     max_retries: int = 3
@@ -146,9 +147,9 @@ class RateLimitHandler:
 
     def execute_with_retry(
         self,
-        operation: Callable[[], tuple[any, dict[str, str]]],
+        operation: Callable[[], tuple[Any, dict[str, str]]],
         should_retry: Callable[[Exception], bool] | None = None,
-    ) -> any:
+    ) -> Any:
         """
         Execute operation with automatic retry on transient failures.
 
