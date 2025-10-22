@@ -470,6 +470,10 @@ python examples/create_post.py --thread-file examples/long_thread_en.txt --chunk
 
 # Wait 8 seconds between each post to avoid rate limits
 python examples/create_post.py --thread-file examples/long_thread_en.txt --segment-pause 8
+
+# Choose a split strategy (simple | sentence | paragraph)
+python examples/create_post.py --thread-file examples/long_thread_en.txt \
+  --chunk-limit 240 --split-strategy sentence
 ```
 
 ### Other Operations

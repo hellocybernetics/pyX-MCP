@@ -470,6 +470,10 @@ python examples/create_post.py --thread-file examples/long_thread_en.txt --chunk
 
 # レートリミット回避のため各投稿間で 8 秒待つ
 python examples/create_post.py --thread-file examples/long_thread_en.txt --segment-pause 8
+
+# 分割戦略を指定（simple|sentence|paragraph）
+python examples/create_post.py --thread-file examples/long_thread_ja.txt \
+  --chunk-limit 200 --split-strategy sentence
 ```
 
 ### その他の操作
